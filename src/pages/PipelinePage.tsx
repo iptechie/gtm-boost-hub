@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { Button } from "@/components/ui/button";
@@ -15,20 +15,44 @@ const PipelinePage: React.FC = () => {
     { id: 'closed', name: 'Closed', color: 'bg-green-100' },
   ];
 
-  const leads = [
+  const [leads, setLeads] = useState([
     { id: '1', name: 'Acme Inc.', company: 'Acme Inc.', value: '$12,000', stage: 'new' },
     { id: '2', name: 'GlobalTech', company: 'GlobalTech', value: '$8,500', stage: 'new' },
     { id: '3', name: 'Innovate Co', company: 'Innovate Co', value: '$15,000', stage: 'contacted' },
     { id: '4', name: 'FutureSystems', company: 'FutureSystems', value: '$22,000', stage: 'contacted' },
     { id: '5', name: 'TechSolutions', company: 'TechSolutions', value: '$18,750', stage: 'qualified' },
     { id: '6', name: 'WebInnovators', company: 'WebInnovators', value: '$9,200', stage: 'closed' },
-  ];
+  ]);
 
   // Group leads by stage
   const leadsByStage = stages.reduce((acc, stage) => {
     acc[stage.id] = leads.filter(lead => lead.stage === stage.id);
     return acc;
   }, {} as Record<string, typeof leads>);
+
+  // Handle drag start
+  const handleDragStart = (e: React.DragEvent, leadId: string) => {
+    e.dataTransfer.setData('leadId', leadId);
+  };
+
+  // Handle drag over
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  // Handle drop
+  const handleDrop = (e: React.DragEvent, targetStage: string) => {
+    e.preventDefault();
+    const leadId = e.dataTransfer.getData('leadId');
+    
+    setLeads(prevLeads => 
+      prevLeads.map(lead => 
+        lead.id === leadId ? { ...lead, stage: targetStage } : lead
+      )
+    );
+    
+    toast.success("Lead moved successfully");
+  };
 
   return (
     <div className="flex">
@@ -65,7 +89,12 @@ const PipelinePage: React.FC = () => {
           {/* Pipeline Board */}
           <div className="flex space-x-4 overflow-x-auto pb-6">
             {stages.map(stage => (
-              <div key={stage.id} className="min-w-[280px] w-[280px] flex-shrink-0">
+              <div 
+                key={stage.id} 
+                className="min-w-[280px] w-[280px] flex-shrink-0"
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, stage.id)}
+              >
                 <div className={`rounded-t-lg px-3 py-2 ${stage.color}`}>
                   <div className="flex justify-between items-center">
                     <h3 className="font-medium">{stage.name}</h3>
@@ -79,6 +108,8 @@ const PipelinePage: React.FC = () => {
                     <div 
                       key={lead.id} 
                       className="bg-white p-3 rounded-lg shadow-sm mb-2 border border-slate-100 cursor-move hover:border-blue-200 transition-all"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, lead.id)}
                     >
                       <h4 className="font-medium text-slate-800">{lead.name}</h4>
                       <p className="text-sm text-slate-500">{lead.company}</p>
