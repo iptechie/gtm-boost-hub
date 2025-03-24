@@ -8,7 +8,8 @@ import {
   Target,
   LogOut,
   Kanban,
-  Mail
+  Mail,
+  Sparkles
 } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
@@ -18,9 +19,10 @@ const Sidebar: React.FC = () => {
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
     { icon: Target, label: 'GTM Strategy', path: '/gtm-strategy' },
+    { icon: Mail, label: 'Mail Planner', path: '/mail-planner' },
     { icon: Users, label: 'Lead Management', path: '/leads' },
     { icon: Kanban, label: 'Pipeline Management', path: '/pipeline' },
-    { icon: Mail, label: 'Mail Planner', path: '/mail-planner' },
+    { icon: Sparkles, label: 'AI Insights', path: '/ai-insights' },
   ];
 
   return (

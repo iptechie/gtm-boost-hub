@@ -11,6 +11,7 @@ import LeadsPage from "./pages/LeadsPage";
 import PipelinePage from "./pages/PipelinePage";
 import GTMStrategyPage from "./pages/GTMStrategyPage";
 import MailPlannerPage from "./pages/MailPlannerPage";
+import AIInsightsPage from "./pages/AIInsightsPage";
 import OrgAdminDashboard from "./pages/OrgAdminDashboard";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import ProfileCreation from "./pages/ProfileCreation";
@@ -32,6 +33,7 @@ const App = () => (
           <Route path="/pipeline" element={<PipelinePage />} />
           <Route path="/gtm-strategy" element={<GTMStrategyPage />} />
           <Route path="/mail-planner" element={<MailPlannerPage />} />
+          <Route path="/ai-insights" element={<AIInsightsPage />} />
           <Route path="/admin/organization" element={<OrgAdminDashboard />} />
           <Route path="/admin/super" element={<SuperAdminDashboard />} />
           <Route path="/create-profile" element={<ProfileCreation />} />
