@@ -5,12 +5,10 @@ import Logo from './Logo';
 import { 
   LayoutDashboard, 
   Users, 
-  Building2, 
-  ShoppingBag, 
-  Settings, 
   Target,
   LogOut,
-  Briefcase
+  Kanban,
+  Mail
 } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
@@ -19,11 +17,10 @@ const Sidebar: React.FC = () => {
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-    { icon: Users, label: 'Leads', path: '/leads' },
-    { icon: Building2, label: 'Company', path: '/company' },
-    { icon: ShoppingBag, label: 'Products', path: '/products' },
-    { icon: Briefcase, label: 'Services', path: '/services' },
     { icon: Target, label: 'GTM Strategy', path: '/gtm-strategy' },
+    { icon: Users, label: 'Lead Management', path: '/leads' },
+    { icon: Kanban, label: 'Pipeline Management', path: '/pipeline' },
+    { icon: Mail, label: 'Mail Planner', path: '/mail-planner' },
   ];
 
   return (

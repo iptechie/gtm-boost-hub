@@ -8,6 +8,9 @@ import Index from "./pages/Index";
 import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
 import LeadsPage from "./pages/LeadsPage";
+import PipelinePage from "./pages/PipelinePage";
+import GTMStrategyPage from "./pages/GTMStrategyPage";
+import MailPlannerPage from "./pages/MailPlannerPage";
 import OrgAdminDashboard from "./pages/OrgAdminDashboard";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import ProfileCreation from "./pages/ProfileCreation";
@@ -26,6 +29,9 @@ const App = () => (
           <Route path="/signup" element={<SignUp />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/leads" element={<LeadsPage />} />
+          <Route path="/pipeline" element={<PipelinePage />} />
+          <Route path="/gtm-strategy" element={<GTMStrategyPage />} />
+          <Route path="/mail-planner" element={<MailPlannerPage />} />
           <Route path="/admin/organization" element={<OrgAdminDashboard />} />
           <Route path="/admin/super" element={<SuperAdminDashboard />} />
           <Route path="/create-profile" element={<ProfileCreation />} />
