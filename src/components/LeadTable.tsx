@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Table, 
@@ -17,7 +16,7 @@ import {
   Plus,
   Bell,
   ChevronDown,
-  WhatsApp
+  Phone
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -66,11 +65,9 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [currentLead, setCurrentLead] = useState<Lead | undefined>(undefined);
 
-  // Filter for leads that have next follow-up today
   const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const followupLeads = leads.filter(lead => lead.nextFollowUp === today);
   
-  // Leads that need to be followed up this week
   const thisWeek = new Date();
   thisWeek.setDate(thisWeek.getDate() + 7);
   const weekDateString = thisWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -117,7 +114,6 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
   };
 
   const handleUpdateStage = (stage: string, leadId?: string) => {
-    // Update stage for a single lead or the selected leads
     if (leadId) {
       toast.success(`Updated lead ${leadId} to stage: ${stage}`);
     } else {
@@ -141,7 +137,6 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
   };
 
   const handleWhatsApp = (phone: string) => {
-    // Create WhatsApp URL with the phone number
     const url = `https://wa.me/${phone.replace(/[^0-9]/g, '')}`;
     window.open(url, '_blank');
     toast.success('Opening WhatsApp');
@@ -339,7 +334,7 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
                       onClick={() => handleWhatsApp(lead.contactInfo.phone)}
                       className="text-green-600"
                     >
-                      <WhatsApp className="h-4 w-4" />
+                      <Phone className="h-4 w-4" />
                     </Button>
                     <Button 
                       size="icon" 
