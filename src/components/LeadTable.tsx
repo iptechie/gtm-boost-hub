@@ -14,7 +14,10 @@ import {
   FileText, 
   Edit, 
   Trash,
-  Plus
+  Plus,
+  Bell,
+  ChevronDown,
+  WhatsApp
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,17 +26,31 @@ import AddLeadDialog from './AddLeadDialog';
 import EditLeadDialog from './EditLeadDialog';
 import BulkActions from './BulkActions';
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export interface Lead {
   id: string;
   name: string;
+  designation?: string;
   company: string;
   contactInfo: {
     email: string;
     phone: string;
   };
-  status: 'New' | 'Qualified' | 'Won';
-  category: string;
+  status: 'New' | 'Qualified' | 'Won' | string;
+  category?: string;
+  industry?: string;
   lastContact: string;
   nextFollowUp: string;
   score: number;
@@ -49,6 +66,19 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [currentLead, setCurrentLead] = useState<Lead | undefined>(undefined);
 
+  // Filter for leads that have next follow-up today
+  const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const followupLeads = leads.filter(lead => lead.nextFollowUp === today);
+  
+  // Leads that need to be followed up this week
+  const thisWeek = new Date();
+  thisWeek.setDate(thisWeek.getDate() + 7);
+  const weekDateString = thisWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const weekFollowupLeads = leads.filter(lead => 
+    lead.nextFollowUp !== today && 
+    new Date(lead.nextFollowUp) <= thisWeek
+  );
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'New':
@@ -57,6 +87,8 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
         return <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-200">{status}</Badge>;
       case 'Won':
         return <Badge className="bg-green-100 text-green-700 hover:bg-green-200">{status}</Badge>;
+      case 'Lost':
+        return <Badge className="bg-red-100 text-red-700 hover:bg-red-200">{status}</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -84,15 +116,18 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
     }
   };
 
-  const handleUpdateStage = (stage: string) => {
-    // This would update the leads in a real application
-    console.log(`Updating leads ${selectedLeads.join(', ')} to stage ${stage}`);
-    setSelectedLeads([]);
+  const handleUpdateStage = (stage: string, leadId?: string) => {
+    // Update stage for a single lead or the selected leads
+    if (leadId) {
+      toast.success(`Updated lead ${leadId} to stage: ${stage}`);
+    } else {
+      toast.success(`Updated ${selectedLeads.length} leads to stage: ${stage}`);
+      setSelectedLeads([]);
+    }
   };
 
   const handleDeleteSelected = () => {
-    // This would delete the leads in a real application
-    console.log(`Deleting leads ${selectedLeads.join(', ')}`);
+    toast.success(`Deleted ${selectedLeads.length} leads`);
     setSelectedLeads([]);
   };
 
@@ -105,21 +140,101 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
     toast.success(`Lead ${id} deleted`);
   };
 
+  const handleWhatsApp = (phone: string) => {
+    // Create WhatsApp URL with the phone number
+    const url = `https://wa.me/${phone.replace(/[^0-9]/g, '')}`;
+    window.open(url, '_blank');
+    toast.success('Opening WhatsApp');
+  };
+
+  const stageOptions = [
+    "New", 
+    "Contacted", 
+    "Qualified", 
+    "Discovery Meeting", 
+    "Demo", 
+    "Proposal", 
+    "Negotiation", 
+    "Won", 
+    "Lost"
+  ];
+
   return (
     <>
       <div className="flex justify-between items-center mb-4">
-        <BulkActions 
-          selectedCount={selectedLeads.length} 
-          onUpdateStage={handleUpdateStage} 
-          onDeleteSelected={handleDeleteSelected} 
-        />
-        <Button 
-          className="btn-gradient flex items-center gap-2"
-          onClick={() => setAddLeadOpen(true)}
-        >
-          <Plus className="h-4 w-4" />
-          Add Lead
-        </Button>
+        <div className="flex items-center gap-4">
+          <Button variant="default" className="btn-gradient">
+            Leads
+          </Button>
+          <BulkActions 
+            selectedCount={selectedLeads.length} 
+            onUpdateStage={handleUpdateStage} 
+            onDeleteSelected={handleDeleteSelected} 
+          />
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="relative"
+              >
+                <Bell className="h-4 w-4" />
+                {(followupLeads.length > 0 || weekFollowupLeads.length > 0) && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                    {followupLeads.length + weekFollowupLeads.length}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80">
+              <div className="space-y-2">
+                <h4 className="font-medium">Follow-ups</h4>
+                
+                {followupLeads.length > 0 && (
+                  <div>
+                    <h5 className="text-sm font-medium text-red-500">Today</h5>
+                    <ul className="space-y-1 mt-1">
+                      {followupLeads.map(lead => (
+                        <li key={lead.id} className="text-sm py-1 px-2 bg-gray-50 rounded-md">
+                          {lead.name} - {lead.company}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {weekFollowupLeads.length > 0 && (
+                  <div className="mt-2">
+                    <h5 className="text-sm font-medium text-amber-500">This Week</h5>
+                    <ul className="space-y-1 mt-1">
+                      {weekFollowupLeads.map(lead => (
+                        <li key={lead.id} className="text-sm py-1 px-2 bg-gray-50 rounded-md flex justify-between">
+                          <span>{lead.name}</span>
+                          <span className="text-gray-500">{lead.nextFollowUp}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {followupLeads.length === 0 && weekFollowupLeads.length === 0 && (
+                  <p className="text-sm text-gray-500">No upcoming follow-ups</p>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+          
+          <Button 
+            className="btn-gradient flex items-center gap-2"
+            onClick={() => setAddLeadOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            Add Lead
+          </Button>
+        </div>
       </div>
 
       <div className="glass-card overflow-hidden">
@@ -128,6 +243,7 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
             <TableRow>
               <TableHead className="w-10">
                 <Checkbox 
+                  className="rounded-sm"
                   checked={selectedLeads.length === leads.length && leads.length > 0} 
                   onCheckedChange={handleSelectAll}
                 />
@@ -135,6 +251,7 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
               <TableHead>NAME</TableHead>
               <TableHead>CONTACT INFO</TableHead>
               <TableHead>CATEGORY</TableHead>
+              <TableHead>STAGE</TableHead>
               <TableHead>LAST CONTACT</TableHead>
               <TableHead>NEXT FOLLOW-UP</TableHead>
               <TableHead>SCORE</TableHead>
@@ -146,6 +263,7 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
               <TableRow key={lead.id} className="table-row-hover">
                 <TableCell>
                   <Checkbox 
+                    className="rounded-sm"
                     checked={selectedLeads.includes(lead.id)} 
                     onCheckedChange={() => handleSelectLead(lead.id)}
                   />
@@ -153,8 +271,10 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
                 <TableCell>
                   <div>
                     <div className="font-medium">{lead.name}</div>
-                    <div className="text-sm text-slate-500">{lead.company}</div>
-                    <div className="mt-1">{getStatusBadge(lead.status)}</div>
+                    {lead.designation && (
+                      <div className="text-xs text-slate-500">{lead.designation}</div>
+                    )}
+                    <div className="text-sm text-slate-500 mt-1">{lead.company}</div>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -163,7 +283,26 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
                     <div className="text-sm text-slate-500">{lead.contactInfo.phone}</div>
                   </div>
                 </TableCell>
-                <TableCell>{lead.category}</TableCell>
+                <TableCell>{lead.category || "N/A"}</TableCell>
+                <TableCell>
+                  <Select 
+                    defaultValue={lead.status} 
+                    onValueChange={(value) => handleUpdateStage(value, lead.id)}
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue>
+                        {getStatusBadge(lead.status)}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {stageOptions.map((stage) => (
+                        <SelectItem key={stage} value={stage}>
+                          {stage}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableCell>
                 <TableCell>{lead.lastContact}</TableCell>
                 <TableCell>{lead.nextFollowUp}</TableCell>
                 <TableCell>
@@ -173,14 +312,34 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
                 </TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
-                    <Button size="icon" variant="ghost">
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      onClick={() => window.open(`https://example.com/lead/${lead.id}`, '_blank')}
+                    >
                       <ExternalLink className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost">
+                    <Button 
+                      size="icon" 
+                      variant="ghost"
+                      onClick={() => toast.info("Message feature coming soon")}
+                    >
                       <MessageSquare className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost">
+                    <Button 
+                      size="icon" 
+                      variant="ghost"
+                      onClick={() => toast.info("View details feature coming soon")}
+                    >
                       <FileText className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      size="icon" 
+                      variant="ghost"
+                      onClick={() => handleWhatsApp(lead.contactInfo.phone)}
+                      className="text-green-600"
+                    >
+                      <WhatsApp className="h-4 w-4" />
                     </Button>
                     <Button 
                       size="icon" 

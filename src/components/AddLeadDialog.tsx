@@ -56,6 +56,26 @@ const AddLeadDialog: React.FC<AddLeadDialogProps> = ({ open, onOpenChange }) => 
     "Lost"
   ];
 
+  const categoryOptions = [
+    "MNC", 
+    "Large Domestic", 
+    "Regional", 
+    "Local"
+  ];
+
+  const industryOptions = [
+    "Technology",
+    "Healthcare",
+    "Finance",
+    "Education", 
+    "Retail",
+    "Manufacturing",
+    "Media",
+    "Transportation",
+    "Energy",
+    "Other"
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
@@ -116,6 +136,36 @@ const AddLeadDialog: React.FC<AddLeadDialogProps> = ({ open, onOpenChange }) => 
                   {stageOptions.map((stage) => (
                     <SelectItem key={stage} value={stage.toLowerCase()}>
                       {stage}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="category" className="text-sm font-medium">Category</label>
+              <Select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoryOptions.map((category) => (
+                    <SelectItem key={category} value={category.toLowerCase()}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="industry" className="text-sm font-medium">Industry</label>
+              <Select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an industry" />
+                </SelectTrigger>
+                <SelectContent>
+                  {industryOptions.map((industry) => (
+                    <SelectItem key={industry} value={industry.toLowerCase()}>
+                      {industry}
                     </SelectItem>
                   ))}
                 </SelectContent>
