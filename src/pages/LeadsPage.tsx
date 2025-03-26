@@ -1,13 +1,13 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from "sonner";
-import { Plus, Import, FileUp } from 'lucide-react';
+import { Plus, Import } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import Header from '../components/Header';
 import LeadTable, { Lead } from '../components/LeadTable';
 import LeadFilter from '../components/LeadFilter';
 import Sidebar from '../components/Sidebar';
+import AddLeadDialog from '../components/AddLeadDialog';
 
 // Mock lead data
 const mockLeads: Lead[] = [
@@ -83,6 +83,8 @@ const LeadsPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({});
+  const [addLeadOpen, setAddLeadOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
 
   // Filter leads based on search term
   const filteredLeads = mockLeads.filter(lead => 
@@ -98,31 +100,25 @@ const LeadsPage: React.FC = () => {
     setFilters(newFilters);
   };
 
-  const handleAddLead = () => {
-    toast.success("Add lead feature will be available in the next update");
-  };
+  // Event listeners for sidebar button actions
+  useEffect(() => {
+    const handleOpenAddLeadDialog = () => setAddLeadOpen(true);
+    const handleOpenNotificationPopover = () => setNotificationOpen(true);
+
+    document.addEventListener('openAddLeadDialog', handleOpenAddLeadDialog);
+    document.addEventListener('openNotificationPopover', handleOpenNotificationPopover);
+
+    return () => {
+      document.removeEventListener('openAddLeadDialog', handleOpenAddLeadDialog);
+      document.removeEventListener('openNotificationPopover', handleOpenNotificationPopover);
+    };
+  }, []);
 
   return (
     <div className="flex">
       <Sidebar />
       <div className="flex-1 min-h-screen ml-64">
-        <Header title="GTM Lead Management">
-          <Button 
-            variant="outline" 
-            className="flex items-center gap-2"
-            onClick={() => toast.info("Import leads is a Pro feature")}
-          >
-            <Import className="h-4 w-4" />
-            Import
-          </Button>
-          <Button 
-            className="btn-gradient flex items-center gap-2"
-            onClick={handleAddLead}
-          >
-            <Plus className="h-4 w-4" />
-            Add Lead
-          </Button>
-        </Header>
+        <Header title="GTM Lead Management" />
 
         <div className="p-6 page-transition">
           <div className="mb-4">
@@ -224,16 +220,23 @@ const LeadsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Filters */}
-          <LeadFilter 
-            onSearch={handleSearch}
-            onFilter={handleFilter}
-          />
+          {/* Main Content - Filters and Table */}
+          <div className="glass-card p-6 mb-6">
+            <h3 className="text-xl font-semibold mb-4">Leads</h3>
+            
+            {/* Filters */}
+            <LeadFilter 
+              onSearch={handleSearch}
+              onFilter={handleFilter}
+            />
 
-          {/* Lead Table */}
-          <LeadTable leads={filteredLeads} />
+            {/* Lead Table */}
+            <LeadTable leads={filteredLeads} />
+          </div>
         </div>
       </div>
+
+      <AddLeadDialog open={addLeadOpen} onOpenChange={setAddLeadOpen} />
     </div>
   );
 };
