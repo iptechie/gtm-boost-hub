@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from "sonner";
-import { Plus, Import } from 'lucide-react';
-import { Button } from "@/components/ui/button";
 import Header from '../components/Header';
 import LeadTable, { Lead } from '../components/LeadTable';
 import LeadFilter from '../components/LeadFilter';
@@ -196,13 +194,13 @@ const LeadsPage: React.FC = () => {
                   <h4 className="font-medium">Leads Usage</h4>
                   <p className="text-sm text-slate-500">35 / 50</p>
                 </div>
-                <Button className="btn-gradient">
+                <button className="btn-gradient">
                   Upgrade
                   <svg xmlns="http://www.w3.org/2000/svg" className="ml-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 12h14"></path>
                     <path d="M12 5l7 7-7 7"></path>
                   </svg>
-                </Button>
+                </button>
               </div>
             </div>
 
