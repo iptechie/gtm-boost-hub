@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "@types/lodash-es": "^4.17.12",
+    "lodash-es": "^4.17.21"
+  },
+  "msw": {
+    "workerDirectory": [
+      "gtm-boost-hub\\public"
+    ]
+  }
+}
