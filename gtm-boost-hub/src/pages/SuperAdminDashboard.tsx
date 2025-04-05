@@ -1,18 +1,6 @@
-
-import React from 'react';
-import { 
-  Plus, 
-  Filter, 
-  RefreshCw, 
-  MoreHorizontal, 
-  Edit, 
-  Users, 
-  UserCheck,
-  Building,
-  CheckCircle,
-  XCircle
-} from 'lucide-react';
-import { Button } from "@/components/ui/button";
+import React, { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { SUBSCRIPTION_PLANS } from "@/types/subscription";
 import {
   Table,
   TableBody,
@@ -21,239 +9,289 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { toast } from "sonner";
+import { Plus } from "lucide-react";
+import { AIApiKeysManager } from "@/components/AIApiKeysManager";
 
-// Mock organizations data
-const organizations = [
+interface SuperAdminData {
+  stats: {
+    totalOrganizations: number;
+    totalUsers: number;
+    monthlyRevenue: number;
+    activeTrials: number;
+  };
+  recentOrganizations: Array<{
+    id: string;
+    name: string;
+    plan: string;
+    users: string;
+    status: string;
+    created: string;
+  }>;
+}
+
+interface ApiKey {
+  id: string;
+  name: string;
+  key: string;
+  service: string;
+  lastUsed?: string;
+  status: "active" | "inactive";
+}
+
+const mockApiKeys: ApiKey[] = [
   {
-    id: '1',
-    name: 'Acme Corporation',
-    subscriptionType: 'Pro',
-    maxUsers: 50,
-    currentUsers: 35,
-    status: 'Active',
+    id: "1",
+    name: "OpenAI Production",
+    key: "sk-1234567890abcdef",
+    service: "OpenAI",
+    lastUsed: "2024-03-20",
+    status: "active",
   },
   {
-    id: '2',
-    name: 'Globex Inc.',
-    subscriptionType: 'Growth',
-    maxUsers: 25,
-    currentUsers: 20,
-    status: 'Active',
-  },
-  {
-    id: '3',
-    name: 'Soylent Corp',
-    subscriptionType: 'Starter',
-    maxUsers: 10,
-    currentUsers: 8,
-    status: 'Active',
-  },
-  {
-    id: '4',
-    name: 'Initech',
-    subscriptionType: 'Free',
-    maxUsers: 5,
-    currentUsers: 3,
-    status: 'Inactive',
+    id: "2",
+    name: "Gemini Development",
+    key: "AIzaSyD9876543210xyz",
+    service: "Google Gemini",
+    lastUsed: "2024-03-19",
+    status: "active",
   },
 ];
 
-const SuperAdminDashboard: React.FC = () => {
-  const handleToggleStatus = (orgId: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
-    toast.success(`Organization status changed to ${newStatus}`);
+const SuperAdminDashboard = () => {
+  const { user } = useAuth();
+  const [data, setData] = useState<SuperAdminData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>(mockApiKeys);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch("/api/admin/super");
+        const result = await response.json();
+        setData(result);
+      } catch (error) {
+        toast.error("Failed to fetch super admin data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handleSaveApiKey = (newApiKey: Omit<ApiKey, "id">) => {
+    const apiKey: ApiKey = {
+      ...newApiKey,
+      id: Math.random().toString(36).substr(2, 9),
+    };
+    setApiKeys([...apiKeys, apiKey]);
   };
 
-  const getSubscriptionBadge = (type: string) => {
-    switch (type) {
-      case 'Pro':
-        return <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-200">{type}</Badge>;
-      case 'Growth':
-        return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200">{type}</Badge>;
-      case 'Starter':
-        return <Badge className="bg-green-100 text-green-700 hover:bg-green-200">{type}</Badge>;
-      case 'Free':
-        return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-200">{type}</Badge>;
-      default:
-        return <Badge variant="outline">{type}</Badge>;
-    }
+  const handleDeleteApiKey = (id: string) => {
+    setApiKeys(apiKeys.filter((key) => key.id !== id));
   };
 
-  return (
-    <div className="flex">
-      <Sidebar />
-      <div className="flex-1 min-h-screen ml-64">
-        <Header title="SuperAdmin Dashboard">
-          <Button 
-            className="btn-gradient flex items-center gap-2"
-            onClick={() => toast.info("Add organization feature coming soon")}
-          >
-            <Plus className="h-4 w-4" />
-            Add Organization
-          </Button>
-        </Header>
+  const handleUpdateApiKey = (id: string, updates: Partial<ApiKey>) => {
+    setApiKeys(
+      apiKeys.map((key) => (key.id === id ? { ...key, ...updates } : key))
+    );
+  };
 
-        <div className="p-6 page-transition">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2">Organization Management</h1>
-            <p className="text-slate-600">Manage all organizations and their subscriptions</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="glass-card p-6 hover-scale">
-              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-blue-100 mb-4">
-                <Building className="h-6 w-6 text-blue-600" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-1">{organizations.length}</h3>
-              <p className="text-slate-600">Total Organizations</p>
-            </div>
-
-            <div className="glass-card p-6 hover-scale">
-              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-green-100 mb-4">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-1">
-                {organizations.filter(org => org.status === 'Active').length}
-              </h3>
-              <p className="text-slate-600">Active Organizations</p>
-            </div>
-
-            <div className="glass-card p-6 hover-scale">
-              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-purple-100 mb-4">
-                <Users className="h-6 w-6 text-purple-600" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-1">
-                {organizations.reduce((sum, org) => sum + org.currentUsers, 0)}
-              </h3>
-              <p className="text-slate-600">Total Users</p>
-            </div>
-          </div>
-
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold">Organizations</h2>
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-                <Input 
-                  placeholder="Search organizations..." 
-                  className="pl-10 w-64"
-                />
-              </div>
-              <Button variant="outline" className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                Filter
-              </Button>
-              <Button variant="outline" className="flex items-center gap-2">
-                <RefreshCw className="h-4 w-4" />
-                Refresh
-              </Button>
-            </div>
-          </div>
-
-          <div className="glass-card overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ORGANIZATION NAME</TableHead>
-                  <TableHead>SUBSCRIPTION</TableHead>
-                  <TableHead>MAX USERS</TableHead>
-                  <TableHead>CURRENT USERS</TableHead>
-                  <TableHead>STATUS</TableHead>
-                  <TableHead className="text-right">ACTIONS</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {organizations.map((org) => (
-                  <TableRow key={org.id} className="table-row-hover">
-                    <TableCell>
-                      <div className="font-medium">{org.name}</div>
-                    </TableCell>
-                    <TableCell>
-                      {getSubscriptionBadge(org.subscriptionType)}
-                    </TableCell>
-                    <TableCell>{org.maxUsers}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <span className="mr-2">{org.currentUsers}</span>
-                        <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-gtm-gradient rounded-full"
-                            style={{ width: `${(org.currentUsers / org.maxUsers) * 100}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          checked={org.status === 'Active'}
-                          onCheckedChange={() => handleToggleStatus(org.id, org.status)}
-                        />
-                        <span className={org.status === 'Active' ? 'text-green-600' : 'text-red-600'}>
-                          {org.status}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />
-                            <span>Edit Details</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Users className="mr-2 h-4 w-4" />
-                            <span>Manage Users</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">
-                            <XCircle className="mr-2 h-4 w-4" />
-                            <span>Delete Organization</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+  if (!user || user.role !== "SUPER_ADMIN") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Unauthorized Access</h1>
+          <p className="text-slate-600">
+            You don't have permission to view this page.
+          </p>
         </div>
       </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Super Admin Dashboard</h1>
+        <Button
+          className="btn-gradient flex items-center gap-2"
+          onClick={() => toast.info("Add organization feature coming soon")}
+        >
+          <Plus className="h-4 w-4" />
+          Add Organization
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Total Organizations</CardTitle>
+            <CardDescription>Active organizations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">
+              {data?.stats.totalOrganizations}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Total Users</CardTitle>
+            <CardDescription>
+              Active users across all organizations
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{data?.stats.totalUsers}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Monthly Revenue</CardTitle>
+            <CardDescription>Current month's revenue</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">${data?.stats.monthlyRevenue}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Active Trials</CardTitle>
+            <CardDescription>Organizations in trial period</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{data?.stats.activeTrials}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mb-8">
+        <AIApiKeysManager
+          apiKeys={apiKeys}
+          onSave={handleSaveApiKey}
+          onDelete={handleDeleteApiKey}
+          onUpdate={handleUpdateApiKey}
+        />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Subscription Plans</CardTitle>
+          <CardDescription>
+            Manage subscription tiers and features
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Plan</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Max Users</TableHead>
+                <TableHead>Max Leads</TableHead>
+                <TableHead>Features</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Object.entries(SUBSCRIPTION_PLANS).map(
+                ([subscriptionTier, plan]) => (
+                  <TableRow key={subscriptionTier}>
+                    <TableCell className="font-medium">{plan.name}</TableCell>
+                    <TableCell>${plan.price}/month</TableCell>
+                    <TableCell>{plan.maxUsers}</TableCell>
+                    <TableCell>{plan.maxLeads}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(plan.features).map(
+                          ([feature, enabled]) => (
+                            <Badge
+                              key={feature}
+                              variant={enabled ? "default" : "secondary"}
+                            >
+                              {feature}
+                            </Badge>
+                          )
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm">
+                        Edit
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>Recent Organizations</CardTitle>
+          <CardDescription>
+            Latest organization signups and updates
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Organization</TableHead>
+                <TableHead>Plan</TableHead>
+                <TableHead>Users</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data?.recentOrganizations.map((org) => (
+                <TableRow key={org.id}>
+                  <TableCell className="font-medium">{org.name}</TableCell>
+                  <TableCell>{org.plan}</TableCell>
+                  <TableCell>{org.users}</TableCell>
+                  <TableCell>
+                    <Badge variant="default">{org.status}</Badge>
+                  </TableCell>
+                  <TableCell>{org.created}</TableCell>
+                  <TableCell>
+                    <Button variant="outline" size="sm">
+                      View
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 };

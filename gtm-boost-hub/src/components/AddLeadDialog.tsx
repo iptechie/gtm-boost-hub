@@ -21,37 +21,47 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { addLead } from "@/lib/api"; // Import the API function
-import type { Lead } from "./LeadTable"; // Import Lead type
+import type { Lead } from "@/types/lead"; // Import Lead type
+import { Label } from "@/components/ui/label";
 
 interface AddLeadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // onSave: (lead: Lead) => void; // Removed unused onSave prop
+  initialData?: Partial<Lead>; // Allow partial initial data
 }
 
-// Define a type for the form values based on input IDs
-type FormValues = {
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  phone?: string;
-  company?: string;
-  title?: string; // Corresponds to designation
-  source?: string;
-  stage?: string; // Corresponds to status
-  value?: number | string; // Add value field
-  category?: string;
-  industry?: string;
-  location?: string;
-  linkedin?: string;
-  notes?: string;
-};
+interface FormData extends Omit<Lead, "id" | "createdAt" | "updatedAt"> {
+  id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 const AddLeadDialog: React.FC<AddLeadDialogProps> = ({
   open,
   onOpenChange,
+  // onSave, // Removed from parameters
+  initialData,
 }) => {
   const queryClient = useQueryClient();
-  const [formValues, setFormValues] = useState<FormValues>({});
+  const [formData, setFormData] = useState<Partial<Lead>>({
+    // Use Partial<Lead> for state
+    name: "",
+    email: "",
+    phone: "",
+    company: "",
+    title: "",
+    industry: "",
+    source: "",
+    status: "New",
+    score: 0,
+    // lastContactDate: new Date().toISOString(), // Removed invalid field
+    notes: "",
+    linkedinUrl: "",
+    instagramUrl: "",
+    twitterUrl: "",
+    ...initialData,
+  });
 
   const addLeadMutation = useMutation({
     mutationFn: addLead,
@@ -59,7 +69,23 @@ const AddLeadDialog: React.FC<AddLeadDialogProps> = ({
       toast.success(`Lead "${data.name}" added successfully`);
       queryClient.invalidateQueries({ queryKey: ["leads"] }); // Invalidate and refetch leads query
       onOpenChange(false); // Close dialog on success
-      setFormValues({}); // Reset form values
+      setFormData({
+        // Reset state according to Partial<Lead>
+        name: "",
+        email: "",
+        phone: "",
+        company: "",
+        title: "",
+        industry: "",
+        source: "",
+        status: "New",
+        score: 0,
+        // lastContactDate: new Date().toISOString(), // Removed invalid field
+        notes: "",
+        linkedinUrl: "",
+        instagramUrl: "",
+        twitterUrl: "",
+      }); // Reset form values
     },
     onError: (error) => {
       toast.error(`Failed to add lead: ${error.message}`);
@@ -70,69 +96,37 @@ const AddLeadDialog: React.FC<AddLeadDialogProps> = ({
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { id, value } = e.target;
-    setFormValues((prev) => ({ ...prev, [id]: value }));
+    setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
   const handleSelectChange = (
-    id: keyof FormValues, // Use keys from FormValues type
+    id: keyof FormData, // Use keys from FormData type
     value: string
   ) => {
-    setFormValues((prev) => ({ ...prev, [id]: value }));
+    setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Construct the lead data, ensuring required fields are present
-    const newLeadData: Omit<Lead, "id"> = {
-      name: `${formValues.firstName || ""} ${formValues.lastName || ""}`.trim(),
-      company: formValues.company || "",
-      contactInfo: {
-        email: formValues.email || "", // Use email from formValues
-        phone: formValues.phone || "", // Use phone from formValues
-      },
-      designation: formValues.title, // Map title to designation
-      status: formValues.stage || "New", // Map stage to status
-      category: formValues.category,
-      industry: formValues.industry,
-      // Add other fields as needed, potentially with defaults
-      lastContact: new Date().toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }),
-      nextFollowUp: "", // Or get from form if added
-      score: 0, // Or get from form if added
-      value: Number(formValues.value) || 0, // Add value, default to 0
-      // Include location, linkedin, notes if they are part of the Lead type and form
-      // Assuming these fields exist in Lead type or need adding:
-      location: formValues.location, // Uncommented this line
-      // linkedin: formValues.linkedin,
-      // notes: formValues.notes,
-      // source: formValues.source, // Assuming source is part of Lead type
-    };
-
-    // Basic validation example
-    if (
-      !newLeadData.name ||
-      !newLeadData.company ||
-      !newLeadData.contactInfo.email
-    ) {
-      toast.error("Please fill in First Name, Company, and Email.");
-      return;
-    }
-
-    addLeadMutation.mutate(newLeadData);
+    // Prepare data for mutation, ensuring required fields are present if necessary
+    // For now, we assume formData has enough to satisfy the 'addLead' API function
+    // Add validation logic here if needed before mutating
+    addLeadMutation.mutate(
+      formData as Omit<Lead, "id" | "createdAt" | "updatedAt">
+    ); // Call the internal mutation
   };
 
   const sourceOptions = [
     "Website",
-    "Email",
-    "Web Form",
-    "LinkedIn",
-    "Database",
-    "Instagram",
     "Facebook",
-    "Custom",
+    "LinkedIn",
+    "Instagram",
+    "X.com",
+    "Partner",
+    "Email",
+    "Call",
+    "Message",
+    "Others",
   ];
 
   const stageOptions = [
@@ -166,95 +160,99 @@ const AddLeadDialog: React.FC<AddLeadDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Lead</DialogTitle>
+          <DialogTitle>
+            {initialData ? "Edit Lead" : "Add New Lead"}
+          </DialogTitle>
           <DialogDescription>
             Fill in the lead's information below.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-2 gap-4 py-4">
-            {/* Input fields using controlled components */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label htmlFor="firstName" className="text-sm font-medium">
-                First Name *
-              </label>
+              <Label htmlFor="name">Name</Label>
               <Input
-                id="firstName"
-                placeholder="John"
-                value={formValues.firstName || ""}
-                onChange={handleInputChange}
+                id="name"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 required
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="lastName" className="text-sm font-medium">
-                Last Name
-              </label>
-              <Input
-                id="lastName"
-                placeholder="Doe"
-                value={formValues.lastName || ""}
-                onChange={handleInputChange}
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email *
-              </label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="john.doe@example.com"
-                value={formValues.email || ""}
-                onChange={handleInputChange}
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
                 required
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="phone" className="text-sm font-medium">
-                Phone
-              </label>
+              <Label htmlFor="phone">Phone</Label>
               <Input
                 id="phone"
-                placeholder="+1 (555) 123-4567"
-                value={formValues.phone || ""}
-                onChange={handleInputChange}
+                value={formData.phone}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="company" className="text-sm font-medium">
-                Company *
-              </label>
+              <Label htmlFor="company">Company</Label>
               <Input
                 id="company"
-                placeholder="Acme Inc."
-                value={formValues.company || ""}
-                onChange={handleInputChange}
+                value={formData.company}
+                onChange={(e) =>
+                  setFormData({ ...formData, company: e.target.value })
+                }
                 required
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="title" className="text-sm font-medium">
-                Job Title
-              </label>
+              <Label htmlFor="title">Title</Label>
               <Input
                 id="title"
-                placeholder="Sales Manager"
-                value={formValues.title || ""}
-                onChange={handleInputChange}
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
               />
             </div>
-            {/* Select fields using controlled components */}
             <div className="space-y-2">
-              <label htmlFor="source" className="text-sm font-medium">
-                Source
-              </label>
+              <Label htmlFor="industry">Industry</Label>
               <Select
-                value={formValues.source || ""}
-                onValueChange={(value) => handleSelectChange("source", value)}
+                value={formData.industry}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, industry: value })
+                }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a source" />
+                  <SelectValue placeholder="Select industry" />
+                </SelectTrigger>
+                <SelectContent>
+                  {industryOptions.map((industry) => (
+                    <SelectItem key={industry} value={industry}>
+                      {industry}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="source">Source</Label>
+              <Select
+                value={formData.source}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, source: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select source" />
                 </SelectTrigger>
                 <SelectContent>
                   {sourceOptions.map((source) => (
@@ -266,111 +264,70 @@ const AddLeadDialog: React.FC<AddLeadDialogProps> = ({
               </Select>
             </div>
             <div className="space-y-2">
-              <label htmlFor="stage" className="text-sm font-medium">
-                Stage
-              </label>
+              <Label htmlFor="status">Status</Label>
               <Select
-                value={formValues.stage || ""}
-                onValueChange={(value) => handleSelectChange("stage", value)}
+                value={formData.status}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, status: value as Lead["status"] })
+                }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a stage" />
+                  <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  {stageOptions.map((stage) => (
-                    <SelectItem key={stage} value={stage}>
-                      {stage}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="New">New</SelectItem>
+                  <SelectItem value="Contacted">Contacted</SelectItem>
+                  <SelectItem value="Qualified">Qualified</SelectItem>
+                  <SelectItem value="Proposal">Proposal</SelectItem>
+                  <SelectItem value="Negotiation">Negotiation</SelectItem>
+                  <SelectItem value="Closed">Closed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <label htmlFor="category" className="text-sm font-medium">
-                Category
-              </label>
-              <Select
-                value={formValues.category || ""}
-                onValueChange={(value) => handleSelectChange("category", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categoryOptions.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="industry" className="text-sm font-medium">
-                Industry
-              </label>
-              <Select
-                value={formValues.industry || ""}
-                onValueChange={(value) => handleSelectChange("industry", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select an industry" />
-                </SelectTrigger>
-                <SelectContent>
-                  {industryOptions.map((industry) => (
-                    <SelectItem key={industry} value={industry}>
-                      {industry}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {/* Other input fields */}
-            <div className="space-y-2">
-              <label htmlFor="location" className="text-sm font-medium">
-                Location
-              </label>
+              <Label htmlFor="linkedinUrl">LinkedIn Profile</Label>
               <Input
-                id="location"
-                placeholder="New York, USA"
-                value={formValues.location || ""}
-                onChange={handleInputChange}
+                id="linkedinUrl"
+                type="url"
+                value={formData.linkedinUrl || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, linkedinUrl: e.target.value })
+                }
+                placeholder="https://linkedin.com/in/username"
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="linkedin" className="text-sm font-medium">
-                LinkedIn URL
-              </label>
+              <Label htmlFor="instagramUrl">Instagram Profile</Label>
               <Input
-                id="linkedin"
-                placeholder="https://linkedin.com/in/johndoe"
-                value={formValues.linkedin || ""}
-                onChange={handleInputChange}
+                id="instagramUrl"
+                type="url"
+                value={formData.instagramUrl || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, instagramUrl: e.target.value })
+                }
+                placeholder="https://instagram.com/username"
               />
             </div>
-            {/* Add Value Input */}
             <div className="space-y-2">
-              <label htmlFor="value" className="text-sm font-medium">
-                Value ($)
-              </label>
+              <Label htmlFor="twitterUrl">Twitter Profile</Label>
               <Input
-                id="value"
-                type="number"
-                placeholder="e.g. 15000"
-                value={formValues.value || ""}
-                onChange={handleInputChange}
-                min="0"
+                id="twitterUrl"
+                type="url"
+                value={formData.twitterUrl || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, twitterUrl: e.target.value })
+                }
+                placeholder="https://twitter.com/username"
               />
             </div>
-            <div className="col-span-2 space-y-2">
-              <label htmlFor="notes" className="text-sm font-medium">
-                Notes
-              </label>
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="notes">Notes</Label>
               <Textarea
                 id="notes"
-                placeholder="Add any additional notes about the lead"
-                value={formValues.notes || ""}
-                onChange={handleInputChange}
+                value={formData.notes}
+                onChange={(e) =>
+                  setFormData({ ...formData, notes: e.target.value })
+                }
               />
             </div>
           </div>

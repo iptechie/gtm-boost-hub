@@ -1,517 +1,364 @@
 import { http, HttpResponse, delay } from "msw";
-import type { Lead } from "@/components/LeadTable"; // Assuming Lead type is exported
-
-// --- Define Pipeline Stage Type ---
-interface PipelineStage {
-  id: string;
-  name: string;
-  order: number;
-  color?: string; // Optional color
-}
-
-// --- Define Activity Log Type ---
-interface ActivityLogEntry {
-  id: string;
-  timestamp: string; // ISO 8601 format string
-  type: "Call" | "Email" | "Note" | "Meeting" | "StageChange";
-  details: string;
-  userId?: string; // Optional: ID of the user who performed the action
-}
-
-// --- Scoring Configuration ---
-
-interface ScoringRule {
-  id: string; // Unique ID for the rule
-  condition: "equals" | "contains" | "isOneOf" | "isNotEmpty";
-  value: string | string[]; // Value(s) to check against
-  points: number; // Points awarded/deducted for this rule (within the field's context)
-}
-
-// Define which Lead fields are scorable. Use 'designation' for Job Title.
-type ScorableLeadField =
-  | "category"
-  | "location"
-  | "designation" // Maps to Job Title
-  | "status" // Maps to Stage
-  | "industry";
-
-interface ScoringFieldConfig {
-  fieldName: ScorableLeadField;
-  label: string; // User-friendly label
-  isActive: boolean;
-  weight: number; // Percentage (0-100)
-  rules: ScoringRule[];
-}
-
-interface ScoringConfig {
-  fields: ScoringFieldConfig[];
-}
-
-const getInitialScoringConfig = (): ScoringConfig => {
-  const storedConfig = sessionStorage.getItem("mockScoringConfig");
-  if (storedConfig) {
-    try {
-      const parsed = JSON.parse(storedConfig);
-      // Basic validation
-      if (Array.isArray(parsed?.fields)) {
-        // Further validation could be added here (e.g., check weights sum)
-        return parsed;
-      }
-      console.warn("Stored scoring config is invalid, using default.");
-    } catch (e) {
-      console.error("Failed to parse stored scoring config, using default.", e);
-    }
-  }
-  // Default Config - Weights should ideally sum to 100 for active fields
-  const defaultConfig: ScoringConfig = {
-    fields: [
-      {
-        fieldName: "category",
-        label: "Category",
-        isActive: true,
-        weight: 20,
-        rules: [
-          { id: "cat1", condition: "equals", value: "MNC", points: 10 },
-          { id: "cat2", condition: "equals", value: "Regional", points: 7 },
-          { id: "cat3", condition: "equals", value: "Local", points: 3 },
-        ],
-      },
-      {
-        fieldName: "location",
-        label: "Location",
-        isActive: true,
-        weight: 15,
-        rules: [
-          { id: "loc1", condition: "contains", value: "New York", points: 10 },
-          { id: "loc2", condition: "contains", value: "London", points: 10 },
-          { id: "loc3", condition: "contains", value: "India", points: 5 },
-        ],
-      },
-      {
-        fieldName: "designation", // Job Title
-        label: "Job Title",
-        isActive: true,
-        weight: 30,
-        rules: [
-          { id: "des1", condition: "equals", value: "CEO", points: 15 },
-          { id: "des2", condition: "equals", value: "CTO", points: 12 },
-          { id: "des3", condition: "contains", value: "VP", points: 10 },
-          { id: "des4", condition: "contains", value: "Director", points: 8 },
-          { id: "des5", condition: "contains", value: "Manager", points: 5 },
-        ],
-      },
-      {
-        fieldName: "status", // Stage
-        label: "Stage",
-        isActive: true,
-        weight: 15,
-        rules: [
-          { id: "sta1", condition: "equals", value: "Qualified", points: 10 },
-          { id: "sta2", condition: "equals", value: "Contacted", points: 5 },
-          { id: "sta3", condition: "equals", value: "New", points: 2 },
-          // Won/Lost might not contribute positively to *lead* score
-        ],
-      },
-      {
-        fieldName: "industry",
-        label: "Industry",
-        isActive: true,
-        weight: 20, // 20+15+30+15+20 = 100
-        rules: [
-          { id: "ind1", condition: "equals", value: "Technology", points: 10 },
-          { id: "ind2", condition: "equals", value: "Finance", points: 8 },
-          { id: "ind3", condition: "equals", value: "Education", points: 5 },
-        ],
-      },
-    ],
-  };
-  sessionStorage.setItem("mockScoringConfig", JSON.stringify(defaultConfig));
-  return defaultConfig;
-};
-
-let currentScoringConfig: ScoringConfig = getInitialScoringConfig();
-
-const updateStoredScoringConfig = (config: ScoringConfig) => {
-  sessionStorage.setItem("mockScoringConfig", JSON.stringify(config));
-};
-
-// --- Score Calculation Logic ---
-
-const calculateLeadScore = (
-  lead: Omit<Lead, "id" | "score"> | Lead, // Accept full Lead type too
-  config: ScoringConfig
-): number => {
-  let totalWeightedScore = 0;
-  let totalActiveWeight = 0;
-
-  config.fields.forEach((fieldConfig) => {
-    if (!fieldConfig.isActive || fieldConfig.weight <= 0) {
-      return; // Skip inactive or zero-weight fields
-    }
-
-    totalActiveWeight += fieldConfig.weight;
-    let fieldScore = 0;
-    const leadIdentifier = lead
-      ? lead.name || ("id" in lead ? `(ID: ${lead.id})` : "(ID missing)")
-      : "(unknown lead)";
-
-    // Check if the field exists on the lead object before accessing
-    if (!Object.prototype.hasOwnProperty.call(lead, fieldConfig.fieldName)) {
-      // console.log(`[ScoreCalc] Lead: ${leadIdentifier}, Field: ${fieldConfig.fieldName} does not exist. Skipping.`);
-      return; // Skip scoring for this field if it doesn't exist on the lead
-    }
-
-    // Handle potential undefined fields gracefully
-    const leadValueRaw = lead[fieldConfig.fieldName as keyof typeof lead];
-    // console.log(`[ScoreCalc] Lead: ${leadIdentifier}, Field: ${fieldConfig.fieldName}, RawValue:`, leadValueRaw);
-
-    // Ensure leadValue is a string before proceeding with string operations
-    if (typeof leadValueRaw === "string" && leadValueRaw.trim() !== "") {
-      const leadValueLower = leadValueRaw.toLowerCase();
-      // console.log(`[ScoreCalc] Lead: ${leadIdentifier}, Field: ${fieldConfig.fieldName}, LowerValue: ${leadValueLower}`);
-
-      fieldConfig.rules.forEach((rule) => {
-        // console.log(`[ScoreCalc] Lead: ${leadIdentifier}, Field: ${fieldConfig.fieldName}, Evaluating Rule: ${rule.id}`);
-        let match = false;
-        const ruleValue = rule.value;
-
-        try {
-          // Wrap individual rule evaluation
-          switch (rule.condition) {
-            case "equals":
-              if (typeof ruleValue === "string") {
-                match = leadValueLower === ruleValue.toLowerCase();
-              }
-              break;
-            case "contains":
-              if (typeof ruleValue === "string") {
-                match = leadValueLower.includes(ruleValue.toLowerCase());
-              }
-              break;
-            case "isOneOf":
-              if (Array.isArray(ruleValue)) {
-                match = ruleValue.some(
-                  (val) =>
-                    typeof val === "string" &&
-                    leadValueLower === val.toLowerCase()
-                );
-              }
-              break;
-            case "isNotEmpty":
-              // Check the original raw value for emptiness, not the lowercased one
-              match = leadValueRaw !== undefined && leadValueRaw !== "";
-              break;
-          }
-        } catch (e) {
-          // Catch errors during rule evaluation
-          console.error(
-            `[ScoreCalc] Error evaluating rule ${rule.id} (Condition: ${rule.condition}) for field ${fieldConfig.fieldName} on lead ${leadIdentifier}:`,
-            e
-          );
-          // Continue to the next rule if one fails
-        }
-
-        if (match) {
-          // console.log(`[ScoreCalc] Lead: ${leadIdentifier}, Field: ${fieldConfig.fieldName}, Rule ${rule.id} MATCHED. Points: ${rule.points}`);
-          fieldScore += rule.points;
-          // Assuming additive points for multiple matching rules within a field
-        }
-      });
-    }
-    // Add weighted score for this field
-    // Normalize the field score based on max possible points for that field?
-    // For now, just use the raw points sum for the field.
-    totalWeightedScore += fieldScore * (fieldConfig.weight / 100);
-  });
-
-  // Normalize the final score to be between 0 and 100
-  // This normalization needs refinement. Let's try scaling based on max possible points.
-  // Estimate max points per field based on defaults (e.g., Category max 10, Location max 10, Job Title max 15, Stage max 10, Industry max 10)
-  const maxPossibleWeightedScore = config.fields.reduce((sum, field) => {
-    if (!field.isActive) return sum;
-    const maxPointsForRule = Math.max(0, ...field.rules.map((r) => r.points)); // Simple max points for a single rule
-    return sum + maxPointsForRule * (field.weight / 100);
-  }, 0);
-
-  // Avoid division by zero
-  let finalScore = 0;
-  if (maxPossibleWeightedScore > 0) {
-    // Scale score relative to the max possible weighted score
-    finalScore = (totalWeightedScore / maxPossibleWeightedScore) * 100;
-  } else {
-    // If max score is 0 (e.g., no active fields/rules with points), score is 0
-    finalScore = 0;
-    // Alternatively, could return totalWeightedScore if that makes sense, but 0 is safer for normalization
-  }
-
-  // Ensure score is a finite number and clamp between 0 and 100
-  if (!isFinite(finalScore)) {
-    console.warn(
-      `Score calculation resulted in non-finite number for lead ${
-        lead.name || ("id" in lead ? lead.id : "")
-      }. Resetting to 0.`
-    );
-    finalScore = 0; // Reset non-finite scores (Infinity, NaN) to 0
-  }
-  finalScore = Math.max(0, Math.min(100, Math.round(finalScore)));
-
-  // console.log(`Calculated score for ${lead.name}: ${finalScore} (Raw Weighted: ${totalWeightedScore.toFixed(2)}, Max Possible Weighted: ${maxPossibleWeightedScore.toFixed(2)})`);
-  return finalScore;
-};
-
-// --- Mock Data ---
-
-// Function to get initial leads, trying sessionStorage first
-const getInitialLeads = (): Lead[] => {
-  const storedLeads = sessionStorage.getItem("mockLeads");
-  if (storedLeads) {
-    try {
-      return JSON.parse(storedLeads);
-    } catch (e) {
-      console.error("Failed to parse stored leads, using default.", e);
-      // Fallback to default if parsing fails
-    }
-  }
-  // Default leads if nothing in sessionStorage or parsing failed
-  const defaultLeads: Lead[] = [
-    {
-      id: "1",
-      name: "Somnath Ghosh",
-      designation: "CEO",
-      company: "SomLance",
-      contactInfo: {
-        email: "ghoshsomnath5@gmail.com",
-        phone: "+91 91-9836841074",
-      },
-      location: "Kolkata, India",
-      value: 15000,
-      status: "Qualified",
-      category: "Regional",
-      industry: "Technology",
-      lastContact: "Mar 23, 2025",
-      nextFollowUp: "Mar 29, 2025",
-      score: 92, // Initial score, will be recalculated if config exists
-    },
-    {
-      id: "2",
-      name: "Sanchita Ghosh",
-      designation: "CTO",
-      company: "SomLance",
-      contactInfo: {
-        email: "ghoshsomnath5@gmail.com",
-        phone: "+91 91-9836841074",
-      },
-      location: "Mumbai, India",
-      value: 8500,
-      status: "New",
-      category: "Local",
-      industry: "Education",
-      lastContact: "Mar 23, 2025",
-      nextFollowUp: new Date().toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }),
-      score: 50, // Initial score
-    },
-    {
-      id: "3",
-      name: "Sanchita Ghosh",
-      designation: "Head of Marketing",
-      company: "Prodomain",
-      contactInfo: {
-        email: "sanchita@gmail.com",
-        phone: "+91 91-9836841074",
-      },
-      location: "London, UK",
-      value: 22000,
-      status: "Won",
-      category: "MNC",
-      industry: "Finance",
-      lastContact: "Mar 23, 2025",
-      nextFollowUp: "Mar 27, 2025",
-      score: 66, // Initial score
-    },
-  ];
-  // Recalculate scores based on default config before storing initially
-  const config = getInitialScoringConfig(); // Get default config
-  const scoredLeads = defaultLeads.map((lead) => ({
-    ...lead,
-    score: calculateLeadScore(lead, config),
-  }));
-  sessionStorage.setItem("mockLeads", JSON.stringify(scoredLeads)); // Store default leads with calculated scores
-  return scoredLeads;
-};
-
-// Use a mutable variable, initialized with potentially stored leads
-let currentMockLeads: Lead[] = getInitialLeads();
-
-// Function to update sessionStorage for leads
-const updateStoredLeads = (leads: Lead[]) => {
-  sessionStorage.setItem("mockLeads", JSON.stringify(leads));
-};
-
-// --- Mock Pipeline Stages Data ---
-
-const getInitialPipelineStages = (): PipelineStage[] => {
-  const storedStages = sessionStorage.getItem("mockPipelineStages");
-  if (storedStages) {
-    try {
-      return JSON.parse(storedStages);
-    } catch (e) {
-      console.error("Failed to parse stored stages, using default.", e);
-    }
-  }
-  // Default stages
-  const defaultStages: PipelineStage[] = [
-    { id: "New", name: "New", order: 0, color: "bg-blue-100" },
-    { id: "Contacted", name: "Contacted", order: 1, color: "bg-purple-100" },
-    { id: "Qualified", name: "Qualified", order: 2, color: "bg-amber-100" },
-    { id: "Won", name: "Won", order: 3, color: "bg-green-100" },
-    { id: "Lost", name: "Lost", order: 4, color: "bg-red-100" }, // Added Lost stage
-  ];
-  sessionStorage.setItem("mockPipelineStages", JSON.stringify(defaultStages));
-  return defaultStages;
-};
-
-let currentMockPipelineStages: PipelineStage[] = getInitialPipelineStages();
-
-// Function to update sessionStorage for stages
-const updateStoredPipelineStages = (stages: PipelineStage[]) => {
-  sessionStorage.setItem("mockPipelineStages", JSON.stringify(stages));
-};
-
-// --- Mock Lead Activity Data ---
-const mockLeadActivity = new Map<string, ActivityLogEntry[]>([
-  [
-    "1", // Lead ID 1 (Somnath Ghosh)
-    [
-      {
-        id: "act101",
-        timestamp: "2025-03-28T10:30:00Z",
-        type: "Call",
-        details: "Initial contact call, discussed needs.",
-        userId: "user1",
-      },
-      {
-        id: "act102",
-        timestamp: "2025-03-29T14:00:00Z",
-        type: "Email",
-        details: "Sent follow-up email with brochure.",
-        userId: "user1",
-      },
-      {
-        id: "act103",
-        timestamp: "2025-03-30T09:15:00Z",
-        type: "StageChange",
-        details: "Stage changed from New to Contacted.",
-        userId: "system",
-      },
-    ],
-  ],
-  [
-    "3", // Lead ID 3 (Sanchita Ghosh - Prodomain)
-    [
-      {
-        id: "act301",
-        timestamp: "2025-03-25T11:00:00Z",
-        type: "Meeting",
-        details: "Discovery meeting held.",
-        userId: "user2",
-      },
-      {
-        id: "act302",
-        timestamp: "2025-03-26T16:45:00Z",
-        type: "Note",
-        details: "Lead interested in premium features.",
-        userId: "user2",
-      },
-    ],
-  ],
-]);
-
-// --- Mock Data Stats (Potentially outdated, remove if not used) ---
-// const leadStats = { ... }; // Commented out as it's static
-
-// Derived from Dashboard.tsx StatsCard props (Keep for now)
-const dashboardStats = {
-  totalLeads: { value: 86, change: { value: "12%", positive: true } },
-  conversionRate: { value: "24%", change: { value: "3%", positive: true } },
-  meetingsBooked: { value: 12, change: { value: "5%", positive: false } },
-  dealsClosed: { value: 8, change: { value: "18%", positive: true } },
-};
-
-// Derived from Dashboard.tsx SubscriptionInfo props
-const subscriptionInfo = {
-  plan: "Pro",
-  daysRemaining: 14,
-  usedLeads: 35,
-  maxLeads: 50,
-};
+import type { Lead } from "@/types/lead"; // Use primary Lead type
+import { User, Organization, SubscriptionTier } from "@/types/auth";
+import { SUBSCRIPTION_PLANS } from "@/types/subscription";
+import type {
+  CustomField,
+  DashboardLayout,
+  LeadCategory,
+  OrganizationConfig,
+  IndustrySettings,
+  PipelineStage,
+} from "@/types/config";
+import type {
+  ActivityLogEntry,
+  ScoringRule,
+  ScorableLeadField,
+  ScoringFieldConfig,
+  ScoringConfig,
+  DashboardStats,
+  SubscriptionInfo,
+  MockState,
+} from "./types";
+import {
+  currentScoringConfig,
+  currentMockLeads,
+  currentMockPipelineStages,
+  mockLeadActivity,
+  dashboardStats,
+  subscriptionInfo,
+  updateMockLeads,
+  updateMockPipelineStages,
+  updateMockScoringConfig,
+  calculateLeadScore,
+} from "./mockData";
 
 // --- API Handlers ---
 
+// Super Admin Handler
+const superAdminHandler = http.get("/api/admin/super", () => {
+  return HttpResponse.json({
+    user: {
+      id: "1",
+      email: "admin@gtmcentric.com",
+      name: "Super Admin",
+      role: "SUPER_ADMIN",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    organization: {
+      id: "1",
+      name: "GTMCentric",
+      subscriptionTier: "PREMIUM",
+      subscriptionStatus: "ACTIVE",
+      maxUsers: 50,
+      currentUsers: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    stats: {
+      totalOrganizations: 42,
+      totalUsers: 156,
+      monthlyRevenue: 2450,
+      activeTrials: 8,
+    },
+    recentOrganizations: [
+      {
+        id: "1",
+        name: "Acme Corp",
+        plan: "Pro",
+        users: "8/10",
+        status: "Active",
+        created: "2024-03-15",
+      },
+    ],
+  });
+});
+
+// Auth Handlers
+const authHandlers = [
+  http.post("/api/auth/login", async ({ request }) => {
+    const { email, password } = (await request.json()) as {
+      email: string;
+      password: string;
+    };
+    await delay(150);
+
+    if (email === "admin@example.com" && password === "admin123") {
+      return HttpResponse.json({
+        user: {
+          id: "1",
+          email: "admin@example.com",
+          name: "Admin User",
+          role: "admin",
+        },
+        token: "mock-jwt-token",
+      });
+    }
+
+    return HttpResponse.json(
+      { message: "Invalid credentials" },
+      { status: 401 }
+    );
+  }),
+
+  http.post("/api/auth/register", async ({ request }) => {
+    const { email, password, name } = (await request.json()) as {
+      email: string;
+      password: string;
+      name: string;
+    };
+    await delay(150);
+
+    return HttpResponse.json({
+      user: {
+        id: "2",
+        email,
+        name,
+        role: "user",
+      },
+      token: "mock-jwt-token",
+    });
+  }),
+
+  http.get("/api/auth/me", async () => {
+    await delay(100);
+    return HttpResponse.json({
+      user: {
+        id: "1",
+        email: "admin@example.com",
+        name: "Admin User",
+        role: "admin",
+      },
+    });
+  }),
+];
+
+// Config Handlers
+const configHandlers = [
+  http.get("/api/organizations/:id/config", async () => {
+    await delay(150);
+    return HttpResponse.json<OrganizationConfig>({
+      customFields: [
+        {
+          id: "1",
+          name: "company_size",
+          label: "Company Size",
+          type: "select",
+          required: false,
+          options: ["1-10", "11-50", "51-200", "201-500", "500+"],
+          description: "The size of the company",
+          order: 1,
+          isActive: true,
+        },
+        {
+          id: "2",
+          name: "annual_revenue",
+          label: "Annual Revenue",
+          type: "select",
+          required: false,
+          options: [
+            "< $1M",
+            "$1M - $10M",
+            "$10M - $50M",
+            "$50M - $100M",
+            "> $100M",
+          ],
+          description: "The annual revenue of the company",
+          order: 2,
+          isActive: true,
+        },
+      ],
+      dashboardLayouts: [
+        {
+          id: "1",
+          name: "Default Layout",
+          description: "Standard dashboard layout",
+          widgets: [
+            {
+              id: "1",
+              name: "Lead Stats",
+              type: "leadStats",
+              position: { x: 0, y: 0, w: 4, h: 2 },
+              config: {},
+              isActive: true,
+            },
+            {
+              id: "2",
+              name: "Pipeline Overview",
+              type: "conversionFunnel",
+              position: { x: 4, y: 0, w: 4, h: 2 },
+              config: {},
+              isActive: true,
+            },
+          ],
+          isDefault: true,
+        },
+      ],
+      pipelineStages: [
+        {
+          id: "new",
+          name: "New",
+          description: "New leads that need to be qualified",
+          color: "#3B82F6",
+          order: 0,
+        },
+        {
+          id: "qualified",
+          name: "Qualified",
+          description: "Leads that have been qualified",
+          color: "#10B981",
+          order: 1,
+        },
+        {
+          id: "proposal",
+          name: "Proposal",
+          description: "Leads with proposals sent",
+          color: "#F59E0B",
+          order: 2,
+        },
+        {
+          id: "negotiation",
+          name: "Negotiation",
+          description: "Leads in negotiation phase",
+          color: "#6366F1",
+          order: 3,
+        },
+        {
+          id: "closed-won",
+          name: "Closed Won",
+          description: "Successfully closed deals",
+          color: "#22C55E",
+          order: 4,
+        },
+        {
+          id: "closed-lost",
+          name: "Closed Lost",
+          description: "Unsuccessful deals",
+          color: "#EF4444",
+          order: 5,
+        },
+      ],
+      leadCategories: [
+        {
+          id: "mnc",
+          name: "MNC",
+          description: "Multinational corporations",
+          color: "#3B82F6",
+        },
+        {
+          id: "sme",
+          name: "SME",
+          description: "Small and medium enterprises",
+          color: "#10B981",
+        },
+        {
+          id: "startup",
+          name: "Startup",
+          description: "Early-stage companies",
+          color: "#F59E0B",
+        },
+      ],
+      industrySpecificSettings: {
+        scoringRules: [
+          {
+            field: "company_size",
+            operator: "in",
+            value: ["201-500", "500+"],
+            score: 10,
+          },
+          {
+            field: "annual_revenue",
+            operator: "in",
+            value: ["$10M - $50M", "$50M - $100M", "> $100M"],
+            score: 15,
+          },
+        ],
+      },
+    });
+  }),
+
+  http.post("/api/organizations/:id/config/fields", async ({ request }) => {
+    const field = (await request.json()) as Omit<
+      CustomField,
+      "id" | "isActive"
+    >;
+    await delay(150);
+    return HttpResponse.json<CustomField>({
+      ...field,
+      id: String(Date.now()),
+      isActive: true,
+    });
+  }),
+
+  http.put(
+    "/api/organizations/:id/config/fields/:fieldId",
+    async ({ request }) => {
+      const field = (await request.json()) as CustomField;
+      await delay(150);
+      return HttpResponse.json<CustomField>(field);
+    }
+  ),
+
+  http.delete("/api/organizations/:id/config/fields/:fieldId", async () => {
+    await delay(150);
+    return HttpResponse.json(null, { status: 204 });
+  }),
+
+  http.put(
+    "/api/organizations/:id/config/pipeline-stages",
+    async ({ request }) => {
+      const { stages } = (await request.json()) as { stages: PipelineStage[] };
+      await delay(150);
+      return HttpResponse.json<PipelineStage[]>(stages);
+    }
+  ),
+
+  http.put(
+    "/api/organizations/:id/config/lead-categories",
+    async ({ request }) => {
+      const { categories } = (await request.json()) as {
+        categories: LeadCategory[];
+      };
+      await delay(150);
+      return HttpResponse.json<LeadCategory[]>(categories);
+    }
+  ),
+
+  http.put(
+    "/api/organizations/:id/config/industry-settings",
+    async ({ request }) => {
+      const settings = (await request.json()) as IndustrySettings;
+      await delay(150);
+      return HttpResponse.json<IndustrySettings>(settings);
+    }
+  ),
+];
+
+// Export all handlers
 export const handlers = [
+  ...authHandlers,
+  ...configHandlers,
   // Ignore favicon requests
   http.get("/favicon.ico", () => {
     return;
   }),
 
   // Handler for accidental GET /leads navigation attempts
-  // This likely indicates a client-side routing issue where a button/link
-  // is incorrectly navigating instead of performing an action.
   http.get("/leads", () => {
     console.warn(
       "[MSW] Intercepted unexpected GET /leads request. This might indicate a client-side routing issue."
     );
-    // Return nothing to let the client-side router potentially handle it,
-    // or return an empty response if needed.
     return;
   }),
 
   // Leads API - GET
   http.get("/api/leads", async () => {
     try {
-      await delay(150); // Simulate network latency
-
-      // Return the mock leads data that matches the Lead type
+      await delay(150);
       return HttpResponse.json(currentMockLeads);
-
-      /* --- Original Logic (Commented Out) ---
-      // Ensure scores are up-to-date based on current config before returning
-      // const scoredLeads = currentMockLeads.map((lead) => ({
-      //   ...lead,
-      //   score: calculateLeadScore(lead, currentScoringConfig),
-      // }));
-      // // Update mock data and storage only if scores actually changed
-      // if (JSON.stringify(scoredLeads) !== JSON.stringify(currentMockLeads)) {
-      //   currentMockLeads = scoredLeads;
-      //   updateStoredLeads(currentMockLeads);
-      // }
-      // // Return the potentially updated list
-      // try {
-      //   // console.log("[MSW] Returning leads:", currentMockLeads); // Add log before returning
-      //   return HttpResponse.json(currentMockLeads);
-      // } catch (serializationError) {
-        console.error(
-          "[MSW] Error serializing leads data:",
-          serializationError
-        );
-        return HttpResponse.json(
-          {
-            message: "Failed to serialize leads data.",
-            error:
-              serializationError instanceof Error
-                ? serializationError.message
-                : String(serializationError),
-          },
-          { status: 500 }
-        );
-      }
-      */
     } catch (error) {
-      console.error("[MSW] General error in GET /api/leads handler:", error); // More specific log
-      // Return a 500 error with a message
+      console.error("[MSW] General error in GET /api/leads handler:", error);
       return HttpResponse.json(
         {
           message: "Failed to fetch leads due to an internal error.",
@@ -524,31 +371,56 @@ export const handlers = [
 
   // Leads API - POST (Add Lead)
   http.post("/api/leads", async ({ request }) => {
-    const newLeadData = (await request.json()) as Omit<Lead, "id">;
-    const newId = String(Date.now()); // Simple ID generation for mock
+    // Ensure newLeadData conforms to Omit<Lead, "id" | "createdAt" | "updatedAt"> potentially
+    const newLeadData = (await request.json()) as Partial<
+      Omit<Lead, "id" | "createdAt" | "updatedAt">
+    >;
+    const newId = String(Date.now());
+    // Construct new lead using the primary Lead structure
     const newLead: Lead = {
-      ...newLeadData,
       id: newId,
-      location: newLeadData.location || undefined,
-      value: newLeadData.value || 0,
-      status: newLeadData.status || "New",
-      lastContact:
-        newLeadData.lastContact ||
-        new Date().toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        }),
-      nextFollowUp: newLeadData.nextFollowUp || "",
-      score: 0, // Initialize score, will be calculated next
+      name: newLeadData.name || "Unknown Name",
+      email: newLeadData.email || "",
+      phone: newLeadData.phone || "",
+      company: newLeadData.company || "",
+      title: newLeadData.title || "",
+      industry: newLeadData.industry || "",
+      // Ensure status conforms to the Lead['status'] union type
+      status: [
+        "New",
+        "Contacted",
+        "Qualified",
+        "Proposal",
+        "Negotiation",
+        "Closed",
+      ].includes(newLeadData.status as string)
+        ? (newLeadData.status as Lead["status"])
+        : "New",
+      source: newLeadData.source || "",
+      notes: newLeadData.notes || "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      linkedinUrl: newLeadData.linkedinUrl,
+      instagramUrl: newLeadData.instagramUrl,
+      twitterUrl: newLeadData.twitterUrl,
+      engagement: newLeadData.engagement,
+      companySize: newLeadData.companySize,
+      budget: newLeadData.budget,
+      timeline: ["Immediate", "1-3 months", "3-6 months", "6+ months"].includes(
+        newLeadData.timeline as string
+      )
+        ? (newLeadData.timeline as Lead["timeline"])
+        : undefined,
+      score: 0, // Initialize score
     };
-    // Calculate score
-    newLead.score = calculateLeadScore(newLead, currentScoringConfig);
+    // Recalculate score based on the new structure and config
+    // Ensure the object passed to calculateLeadScore matches its expected parameter type
+    newLead.score = calculateLeadScore(newLead as Lead, currentScoringConfig); // Cast to Lead if necessary
 
-    currentMockLeads.push(newLead);
-    updateStoredLeads(currentMockLeads); // Update sessionStorage
-    await delay(300); // Simulate network latency
-    return HttpResponse.json(newLead, { status: 201 }); // Return created lead
+    const updatedLeads = [...currentMockLeads, newLead];
+    updateMockLeads(updatedLeads);
+    await delay(300);
+    return HttpResponse.json(newLead, { status: 201 });
   }),
 
   // Leads API - PUT (Update Lead)
@@ -560,21 +432,18 @@ export const handlers = [
     );
 
     if (leadToUpdate) {
-      // Apply updates
       const updatedLeadData = { ...leadToUpdate, ...updatedData };
-      // Recalculate score
       updatedLeadData.score = calculateLeadScore(
         updatedLeadData,
         currentScoringConfig
       );
 
-      // Update the array
-      currentMockLeads = currentMockLeads.map((lead) =>
+      const updatedLeads = currentMockLeads.map((lead) =>
         lead.id === id ? updatedLeadData : lead
       );
+      updateMockLeads(updatedLeads);
 
-      updateStoredLeads(currentMockLeads); // Update sessionStorage
-      await delay(250); // Simulate latency
+      await delay(250);
       return HttpResponse.json(updatedLeadData);
     } else {
       await delay(100);
@@ -586,12 +455,12 @@ export const handlers = [
   http.delete("/api/leads/:id", async ({ params }) => {
     const { id } = params;
     const initialLength = currentMockLeads.length;
-    currentMockLeads = currentMockLeads.filter((lead) => lead.id !== id);
+    const updatedLeads = currentMockLeads.filter((lead) => lead.id !== id);
 
-    if (currentMockLeads.length < initialLength) {
-      updateStoredLeads(currentMockLeads); // Update sessionStorage
+    if (updatedLeads.length < initialLength) {
+      updateMockLeads(updatedLeads);
       await delay(150);
-      return HttpResponse.json(null, { status: 204 }); // No Content = Success
+      return HttpResponse.json(null, { status: 204 });
     } else {
       await delay(100);
       return HttpResponse.json({ message: "Lead not found" }, { status: 404 });
@@ -601,7 +470,7 @@ export const handlers = [
   // Lead Activity API - GET
   http.get("/api/leads/:id/activity", async ({ params }) => {
     const { id } = params;
-    await delay(200); // Simulate network latency
+    await delay(200);
     const activities = mockLeadActivity.get(id as string) || [];
     return HttpResponse.json(activities);
   }),
@@ -622,24 +491,19 @@ export const handlers = [
     }
 
     const newActivity: ActivityLogEntry = {
-      id: `act${Date.now()}`, // Simple unique ID
+      id: `act${Date.now()}`,
       timestamp: new Date().toISOString(),
       type: type,
       details: details,
-      userId: "currentUser", // Placeholder for logged-in user
+      userId: "currentUser",
     };
 
     const existingActivities = mockLeadActivity.get(id as string) || [];
     mockLeadActivity.set(id as string, [...existingActivities, newActivity]);
 
-    await delay(250); // Simulate network latency
-    return HttpResponse.json(newActivity, { status: 201 }); // Return created activity
+    await delay(250);
+    return HttpResponse.json(newActivity, { status: 201 });
   }),
-
-  // Lead Stats API - GET (Commented out as static data is likely inaccurate now)
-  // http.get("/api/stats/leads", () => {
-  //   return HttpResponse.json(leadStats);
-  // }),
 
   // Dashboard Stats API
   http.get("/api/stats/dashboard", () => {
@@ -648,14 +512,8 @@ export const handlers = [
 
   // Subscription Info API
   http.get("/api/subscription", async () => {
-    await delay(50); // Add small delay
-    // Return data that matches the SubscriptionInfo type
-    return HttpResponse.json({
-      plan: "Pro",
-      daysRemaining: 14,
-      usedLeads: 35,
-      maxLeads: 50,
-    });
+    await delay(50);
+    return HttpResponse.json(subscriptionInfo);
   }),
 
   // Leads API - POST (Import Leads)
@@ -663,60 +521,93 @@ export const handlers = [
     const leadsToImport = (await request.json()) as Omit<Lead, "id">[];
     let importedCount = 0;
     let skippedCount = 0;
+    // Use direct email access and ensure currentMockLeads conforms to primary Lead type
     const existingEmails = new Set(
-      currentMockLeads.map((lead) => lead.contactInfo.email.toLowerCase())
+      currentMockLeads.map((lead) => lead.email.toLowerCase())
     );
 
     leadsToImport.forEach((leadData) => {
-      const emailLower = leadData.contactInfo.email.toLowerCase();
+      // Assume leadData might still have contactInfo structure from import source
+      // Also handle potential missing fields in leadData
+      const email = leadData.email; // Use direct email
+      if (!email) {
+        console.warn(
+          "[MSW] Skipped importing lead due to missing email:",
+          leadData
+        );
+        skippedCount++;
+        return; // Skip if no email
+      }
+      const emailLower = email.toLowerCase();
+
       if (existingEmails.has(emailLower)) {
         skippedCount++;
       } else {
-        const newId = String(Date.now() + importedCount); // Simple unique ID
+        const newId = String(Date.now() + importedCount);
+        // Construct new lead using the primary Lead structure
         const newLead: Lead = {
-          ...leadData,
           id: newId,
-          location: leadData.location || undefined,
-          value: leadData.value || 0,
-          status: leadData.status || "New",
-          lastContact:
-            leadData.lastContact ||
-            new Date().toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            }),
-          nextFollowUp: leadData.nextFollowUp || "",
-          score: 0, // Initialize score, calculate below
+          name: leadData.name || "Unknown Name",
+          email: email,
+          phone: leadData.phone || "",
+          company: leadData.company || "",
+          title: leadData.title || "",
+          industry: leadData.industry || "",
+          // Ensure status conforms to the Lead['status'] union type
+          status: [
+            "New",
+            "Contacted",
+            "Qualified",
+            "Proposal",
+            "Negotiation",
+            "Closed",
+          ].includes(leadData.status as string)
+            ? (leadData.status as Lead["status"])
+            : "New",
+          source: leadData.source || "",
+          notes: leadData.notes || "",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          linkedinUrl: leadData.linkedinUrl,
+          instagramUrl: leadData.instagramUrl,
+          twitterUrl: leadData.twitterUrl,
+          engagement: leadData.engagement,
+          companySize: leadData.companySize,
+          budget: leadData.budget,
+          timeline: [
+            "Immediate",
+            "1-3 months",
+            "3-6 months",
+            "6+ months",
+          ].includes(leadData.timeline as string)
+            ? (leadData.timeline as Lead["timeline"])
+            : undefined,
+          score: 0, // Initialize score
         };
-        // Calculate score
+        // Recalculate score based on the new structure and config
         newLead.score = calculateLeadScore(newLead, currentScoringConfig);
 
         currentMockLeads.push(newLead);
-        existingEmails.add(emailLower); // Add new email to set
+        existingEmails.add(emailLower);
         importedCount++;
       }
     });
 
-    updateStoredLeads(currentMockLeads); // Update sessionStorage
-    await delay(500); // Simulate import processing time
+    updateMockLeads(currentMockLeads);
+    await delay(500);
 
     return HttpResponse.json({ importedCount, skippedCount }, { status: 200 });
   }),
 
-  // --- Pipeline Stages API Handlers ---
-
-  // GET /api/pipeline-stages
+  // Pipeline Stages API
   http.get("/api/pipeline-stages", async () => {
     await delay(100);
-    // Return stages sorted by order
     const sortedStages = [...currentMockPipelineStages].sort(
       (a, b) => a.order - b.order
     );
     return HttpResponse.json(sortedStages);
   }),
 
-  // POST /api/pipeline-stages (Create Stage)
   http.post("/api/pipeline-stages", async ({ request }) => {
     const { name, color } = (await request.json()) as Partial<PipelineStage>;
     if (!name) {
@@ -725,11 +616,11 @@ export const handlers = [
         { status: 400 }
       );
     }
-    const newId = name.toLowerCase().replace(/\s+/g, "-"); // Simple ID from name
+    const newId = name.toLowerCase().replace(/\s+/g, "-");
     if (currentMockPipelineStages.some((stage) => stage.id === newId)) {
       return HttpResponse.json(
         { message: `Stage with ID ${newId} already exists` },
-        { status: 409 } // Conflict
+        { status: 409 }
       );
     }
     const maxOrder = currentMockPipelineStages.reduce(
@@ -739,22 +630,22 @@ export const handlers = [
     const newStage: PipelineStage = {
       id: newId,
       name: name,
+      description: "",
       order: maxOrder + 1,
       color: color,
     };
-    currentMockPipelineStages.push(newStage);
-    updateStoredPipelineStages(currentMockPipelineStages);
+    const updatedStages = [...currentMockPipelineStages, newStage];
+    updateMockPipelineStages(updatedStages);
     await delay(200);
     return HttpResponse.json(newStage, { status: 201 });
   }),
 
-  // PUT /api/pipeline-stages/:id (Update Stage Name/Color)
   http.put("/api/pipeline-stages/:id", async ({ request, params }) => {
     const { id } = params;
     const { name, color } = (await request.json()) as Partial<PipelineStage>;
     let updatedStage: PipelineStage | undefined = undefined;
 
-    currentMockPipelineStages = currentMockPipelineStages.map((stage) => {
+    const updatedStages = currentMockPipelineStages.map((stage) => {
       if (stage.id === id) {
         updatedStage = {
           ...stage,
@@ -767,7 +658,7 @@ export const handlers = [
     });
 
     if (updatedStage) {
-      updateStoredPipelineStages(currentMockPipelineStages);
+      updateMockPipelineStages(updatedStages);
       await delay(150);
       return HttpResponse.json(updatedStage);
     } else {
@@ -778,7 +669,6 @@ export const handlers = [
     }
   }),
 
-  // PATCH /api/pipeline-stages (Batch Update Order)
   http.patch("/api/pipeline-stages", async ({ request }) => {
     const updates = (await request.json()) as { id: string; order: number }[];
     const stageMap = new Map(
@@ -795,12 +685,10 @@ export const handlers = [
     });
 
     if (changesMade) {
-      currentMockPipelineStages = Array.from(stageMap.values());
-      updateStoredPipelineStages(currentMockPipelineStages);
+      const updatedStages = Array.from(stageMap.values());
+      updateMockPipelineStages(updatedStages);
       await delay(200);
-      const sortedStages = [...currentMockPipelineStages].sort(
-        (a, b) => a.order - b.order
-      );
+      const sortedStages = [...updatedStages].sort((a, b) => a.order - b.order);
       return HttpResponse.json(sortedStages);
     } else {
       return HttpResponse.json(
@@ -810,33 +698,58 @@ export const handlers = [
     }
   }),
 
-  // DELETE /api/pipeline-stages/:id
   http.delete("/api/pipeline-stages/:id", async ({ params }) => {
     const { id } = params;
     const initialLength = currentMockPipelineStages.length;
-    currentMockPipelineStages = currentMockPipelineStages.filter(
+    const updatedStages = currentMockPipelineStages.filter(
       (stage) => stage.id !== id
     );
 
-    const firstStageId = [...currentMockPipelineStages].sort(
-      (a, b) => a.order - b.order
-    )[0]?.id;
-    if (firstStageId) {
-      currentMockLeads = currentMockLeads.map((lead) =>
-        lead.status === id ? { ...lead, status: firstStageId } : lead
-      );
-      // Recalculate scores for affected leads
-      currentMockLeads = currentMockLeads.map((lead) => ({
-        ...lead,
-        score: calculateLeadScore(lead, currentScoringConfig),
+    const firstStageId = [...updatedStages].sort((a, b) => a.order - b.order)[0]
+      ?.id;
+    // Ensure the status being assigned is valid
+    const validStatuses: Lead["status"][] = [
+      "New",
+      "Contacted",
+      "Qualified",
+      "Proposal",
+      "Negotiation",
+      "Closed",
+    ];
+    if (
+      firstStageId &&
+      validStatuses.includes(firstStageId as Lead["status"])
+    ) {
+      const validFirstStageId = firstStageId as Lead["status"]; // Cast to the specific union type
+
+      // Map and ensure correct type *before* rescoring
+      const updatedLeadsTyped: Lead[] = currentMockLeads.map((lead): Lead => {
+        if (lead.status === id) {
+          // Return a new object explicitly typed as Lead with the corrected status
+          return { ...lead, status: validFirstStageId };
+        }
+        // Return the original lead, assuming it already conforms to Lead type
+        // If currentMockLeads could be inconsistent, more checks might be needed here
+        return lead;
+      });
+
+      // Rescore using the correctly typed array
+      const rescoredLeads = updatedLeadsTyped.map((typedLead) => ({
+        ...typedLead,
+        score: calculateLeadScore(typedLead, currentScoringConfig), // Pass the correctly typed lead
       }));
-      updateStoredLeads(currentMockLeads); // Update leads as well
+
+      updateMockLeads(rescoredLeads); // Pass the correctly typed array
+    } else if (firstStageId) {
+      console.warn(
+        `[MSW] Could not reassign leads from deleted stage '${id}' to invalid stage '${firstStageId}'. Leads remain in old stage.`
+      );
     }
 
-    if (currentMockPipelineStages.length < initialLength) {
-      updateStoredPipelineStages(currentMockPipelineStages);
+    if (updatedStages.length < initialLength) {
+      updateMockPipelineStages(updatedStages);
       await delay(150);
-      return HttpResponse.json(null, { status: 204 }); // No Content
+      return HttpResponse.json(null, { status: 204 });
     } else {
       return HttpResponse.json(
         { message: "Pipeline stage not found" },
@@ -845,29 +758,109 @@ export const handlers = [
     }
   }),
 
-  // --- Scoring Config API Handlers (Placeholder) ---
-
-  // GET /api/scoring-config
+  // Scoring Config API
   http.get("/api/scoring-config", async () => {
     await delay(50);
     return HttpResponse.json(currentScoringConfig);
   }),
 
-  // PUT /api/scoring-config (Replace entire config)
   http.put("/api/scoring-config", async ({ request }) => {
     const newConfig = (await request.json()) as ScoringConfig;
-    // Add validation here if needed (e.g., check weights sum to 100)
-    currentScoringConfig = newConfig;
-    updateStoredScoringConfig(currentScoringConfig);
+    updateMockScoringConfig(newConfig);
 
-    // Trigger recalculation of all lead scores after config change
-    currentMockLeads = currentMockLeads.map((lead) => ({
-      ...lead,
-      score: calculateLeadScore(lead, currentScoringConfig),
-    }));
-    updateStoredLeads(currentMockLeads);
+    // Ensure leads conform to Lead type before calculating score and updating
+    const updatedLeads = currentMockLeads.map((lead): Lead => {
+      // Validate and cast status explicitly
+      const validStatuses: Lead["status"][] = [
+        "New",
+        "Contacted",
+        "Qualified",
+        "Proposal",
+        "Negotiation",
+        "Closed",
+      ];
+      const validatedStatus = validStatuses.includes(
+        lead.status as Lead["status"]
+      )
+        ? (lead.status as Lead["status"])
+        : "New"; // Default to 'New' if invalid
+
+      const typedLead = {
+        ...lead,
+        status: validatedStatus, // Use the validated status
+      } as Lead; // Cast the whole object after ensuring status is correct
+
+      return {
+        ...typedLead,
+        score: calculateLeadScore(typedLead, newConfig),
+      };
+    });
+    updateMockLeads(updatedLeads); // Pass the correctly typed array
 
     await delay(150);
-    return HttpResponse.json(currentScoringConfig);
+    return HttpResponse.json(newConfig);
+  }),
+
+  // Super Admin API
+  superAdminHandler,
+
+  // AI Insights API - GET (Returns leads for the page)
+  http.get("/api/ai-insights", async () => {
+    await delay(100);
+
+    // Get mock leads with scoring data
+    const leadsWithScores = currentMockLeads.map((lead) => {
+      // Add mock scoring data if not present
+      if (!lead.engagement) lead.engagement = Math.floor(Math.random() * 100);
+      if (!lead.companySize)
+        lead.companySize = Math.floor(Math.random() * 5000);
+      if (!lead.budget) lead.budget = Math.floor(Math.random() * 200000);
+      if (!lead.timeline) {
+        const timelines = [
+          "Immediate",
+          "1-3 months",
+          "3-6 months",
+          "6+ months",
+        ] as const;
+        lead.timeline = timelines[Math.floor(Math.random() * timelines.length)];
+      }
+
+      return lead;
+    });
+
+    // Get mock job changes
+    const jobChanges = [
+      {
+        id: "change-mock-1",
+        leadId: "1",
+        previousCompany: "Old Company A",
+        previousTitle: "Junior Dev",
+        newCompany: "SomLance",
+        newTitle: "CEO",
+        changeDate: new Date(
+          Date.now() - 3 * 24 * 60 * 60 * 1000
+        ).toISOString(),
+        source: "LinkedIn",
+        status: "Pending",
+      },
+      {
+        id: "change-mock-2",
+        leadId: "3",
+        previousCompany: "Startup X",
+        previousTitle: "Marketing Intern",
+        newCompany: "Prodomain",
+        newTitle: "Head of Marketing",
+        changeDate: new Date(
+          Date.now() - 5 * 24 * 60 * 60 * 1000
+        ).toISOString(),
+        source: "LinkedIn",
+        status: "Pending",
+      },
+    ];
+
+    return HttpResponse.json({
+      leads: leadsWithScores,
+      jobChanges: jobChanges,
+    });
   }),
 ];

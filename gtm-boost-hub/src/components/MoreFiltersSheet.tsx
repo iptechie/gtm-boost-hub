@@ -31,6 +31,7 @@ export interface MoreFilters {
   lastContactStartDate?: Date;
   lastContactEndDate?: Date;
   scoreRange?: [number, number]; // Min/Max score
+  communicationDetails?: string;
 }
 
 interface MoreFiltersSheetProps {

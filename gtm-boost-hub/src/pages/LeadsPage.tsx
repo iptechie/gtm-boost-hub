@@ -4,12 +4,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Papa from "papaparse";
 import { toast } from "sonner";
 // Removed Header import
-import LeadTable, { Lead } from "../components/LeadTable";
+import LeadTable from "../components/LeadTable";
+import type { Lead, LeadStatus } from "@/types/lead";
 import LeadFilter from "../components/LeadFilter";
 // Removed Sidebar import
 import AddLeadDialog from "../components/AddLeadDialog";
 import ImportLeadsDialog from "../components/ImportLeadsDialog";
 // Removed NotificationPopover import
+import { useLeadConfiguration } from "@/contexts/LeadConfigurationContext";
 import {
   fetchLeads,
   fetchSubscriptionInfo,
@@ -31,6 +33,7 @@ import {
   endOfQuarter,
   endOfYear,
 } from "date-fns";
+import { mockLeadActivity } from "@/mocks/mockData";
 
 // Define the filter structure including new fields
 // Import DateRange type from react-day-picker
@@ -38,20 +41,22 @@ import type { DateRange } from "react-day-picker";
 
 interface ActiveFilters {
   category?: string;
-  stage?: string;
+  stage?: Lead["status"];
   location?: string;
-  lastCommunicationDateRange?: DateRange; // Renamed from dateRange
+  lastCommunicationDateRange?: DateRange;
   industry?: string;
-  source?: string; // Added source
-  jobTitle?: string; // Added jobTitle
+  source?: string;
+  jobTitle?: string;
   lastContactRange?: string;
   scoreRange?: [number, number];
+  communicationDetails?: string;
+  activityDetails?: string;
 }
 
 // Define expected CSV headers
 const EXPECTED_HEADERS = [
   "name",
-  "designation",
+  "title",
   "company",
   "email",
   "phone",
@@ -67,21 +72,22 @@ const EXPECTED_HEADERS = [
 // Define an interface representing a row from the CSV
 interface CsvLeadRow {
   name: string;
-  designation?: string;
+  title?: string;
   company?: string;
   email: string;
   phone?: string;
   location?: string;
-  status?: string;
+  status?: LeadStatus;
   score?: string;
   lastContact?: string;
   nextFollowUp?: string;
   category?: string;
   industry?: string;
-  [key: string]: string | undefined;
+  [key: string]: string | LeadStatus | undefined;
 }
 
 const LeadsPage: React.FC = () => {
+  const { configuration } = useLeadConfiguration();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState<ActiveFilters>({});
@@ -119,8 +125,21 @@ const LeadsPage: React.FC = () => {
         (lead) =>
           lead.name.toLowerCase().includes(lowerSearchTerm) ||
           lead.company.toLowerCase().includes(lowerSearchTerm) ||
-          lead.contactInfo.email.toLowerCase().includes(lowerSearchTerm)
+          lead.email.toLowerCase().includes(lowerSearchTerm)
       );
+    }
+
+    // Apply activity details filter
+    if (filters.activityDetails) {
+      const lowerSearchTerm = filters.activityDetails.toLowerCase();
+      leads = leads.filter((lead) => {
+        // Get activities for this lead
+        const activities = mockLeadActivity.get(lead.id) || [];
+        // Search through activity details
+        return activities.some((activity) =>
+          activity.details.toLowerCase().includes(lowerSearchTerm)
+        );
+      });
     }
 
     // Apply basic filters
@@ -131,9 +150,7 @@ const LeadsPage: React.FC = () => {
       );
     }
     if (filters.stage) {
-      leads = leads.filter(
-        (lead) => lead.status.toLowerCase() === filters.stage?.toLowerCase()
-      );
+      leads = leads.filter((lead) => lead.status === filters.stage);
     }
     if (filters.location) {
       const lowerLocation = filters.location.toLowerCase();
@@ -159,10 +176,10 @@ const LeadsPage: React.FC = () => {
         try {
           // Try parsing ISO format first, then fallback to 'MMM d, yyyy'
           try {
-            leadDate = parseISO(lead.lastContact);
+            leadDate = parseISO(lead.lastContact || "");
           } catch (isoError) {
             // If ISO parsing fails, try the specific format
-            leadDate = parse(lead.lastContact, "MMM d, yyyy", new Date());
+            leadDate = parse(lead.lastContact || "", "MMM d, yyyy", new Date());
           }
 
           // Check if the parsed date is valid
@@ -200,19 +217,17 @@ const LeadsPage: React.FC = () => {
         (lead) => lead.category?.toLowerCase() === filters.source
       );
     }
-    // Add Job Title filter (maps to designation)
+    // Add Job Title filter (maps to title)
     if (filters.jobTitle) {
       const lowerJobTitle = filters.jobTitle.toLowerCase();
       leads = leads.filter(
-        (lead) =>
-          lead.designation &&
-          lead.designation.toLowerCase().includes(lowerJobTitle)
+        (lead) => lead.title && lead.title.toLowerCase().includes(lowerJobTitle)
       );
     }
     if (filters.scoreRange) {
       const [minScore, maxScore] = filters.scoreRange;
       leads = leads.filter(
-        (lead) => lead.score >= minScore && lead.score <= maxScore
+        (lead) => (lead.score || 0) >= minScore && (lead.score || 0) <= maxScore
       );
     }
     if (filters.lastContactRange) {
@@ -249,10 +264,10 @@ const LeadsPage: React.FC = () => {
               let contactDate: Date | null = null;
               // Try parsing ISO format first, then fallback
               try {
-                contactDate = parseISO(lead.lastContact);
+                contactDate = parseISO(lead.lastContact || "");
               } catch (isoError) {
                 contactDate = parse(
-                  lead.lastContact,
+                  lead.lastContact || "",
                   "MMM d, yyyy",
                   new Date()
                 );
@@ -278,6 +293,17 @@ const LeadsPage: React.FC = () => {
         console.error("Error processing date range filter:", e);
       }
     }
+    // Apply communication details filter
+    if (filters.communicationDetails) {
+      const lowerSearchTerm = filters.communicationDetails.toLowerCase();
+      leads = leads.filter((lead) => {
+        // Fetch activity data for this lead
+        const activities = mockLeadActivity.get(lead.id) || [];
+        return activities.some((activity) =>
+          activity.details.toLowerCase().includes(lowerSearchTerm)
+        );
+      });
+    }
     return leads;
   }, [leadsData, searchTerm, filters]);
 
@@ -295,7 +321,11 @@ const LeadsPage: React.FC = () => {
     let opportunitiesCount = 0;
     leadsData.forEach((lead) => {
       try {
-        const contactDate = parse(lead.lastContact, "MMM d, yyyy", new Date());
+        const contactDate = parse(
+          lead.lastContact || "",
+          "MMM d, yyyy",
+          new Date()
+        );
         if (isThisMonth(contactDate)) {
           // Refine logic if needed
         }
@@ -304,7 +334,8 @@ const LeadsPage: React.FC = () => {
       }
       if (lead.status === "New") newThisMonthCount++;
       if (lead.status === "Qualified") qualifiedCount++;
-      if (lead.status === "Won") opportunitiesCount++;
+      if (lead.status === "Closed Won" || lead.status === "Closed Lost")
+        opportunitiesCount++;
     });
     return {
       total: { count: leadsData.length, growth: 0 },
@@ -349,7 +380,11 @@ const LeadsPage: React.FC = () => {
   }, []); // Removed notification state dependencies if any were added previously
 
   // --- Lead Import Logic ---
-  const importMutation = useMutation<ImportResult, Error, Omit<Lead, "id">[]>({
+  const importMutation = useMutation<
+    ImportResult,
+    Error,
+    Omit<Lead, "id" | "createdAt" | "updatedAt">[]
+  >({
     mutationFn: importLeads,
     onSuccess: (data: ImportResult) => {
       toast.success(
@@ -394,7 +429,10 @@ const LeadsPage: React.FC = () => {
               return;
             }
 
-            const leadsToImport: Omit<Lead, "id">[] = [];
+            const leadsToImport: Omit<
+              Lead,
+              "id" | "createdAt" | "updatedAt"
+            >[] = [];
             const validationErrors: string[] = [];
             results.data.forEach((row: CsvLeadRow, index: number) => {
               const trimmedRow: Partial<CsvLeadRow> = {};
@@ -413,21 +451,22 @@ const LeadsPage: React.FC = () => {
                 );
               } else {
                 const score = parseInt(trimmedRow.score ?? "0", 10);
+                const status = (trimmedRow.status || "New") as LeadStatus;
                 leadsToImport.push({
                   name: trimmedRow.name!,
-                  designation: trimmedRow.designation || "",
+                  title: trimmedRow.title || "",
                   company: trimmedRow.company || "",
-                  contactInfo: {
-                    email: trimmedRow.email!,
-                    phone: trimmedRow.phone || "",
-                  },
+                  email: trimmedRow.email!,
+                  phone: trimmedRow.phone || "",
                   location: trimmedRow.location || undefined,
-                  status: trimmedRow.status || "New",
+                  status,
                   score: isNaN(score) ? 0 : score,
                   lastContact: trimmedRow.lastContact || "",
                   nextFollowUp: trimmedRow.nextFollowUp || "",
                   category: trimmedRow.category || "",
                   industry: trimmedRow.industry || "",
+                  notes: "",
+                  source: "",
                 });
               }
             });
@@ -677,13 +716,28 @@ const LeadsPage: React.FC = () => {
       {/* Main Content */}
       <div className="glass-card p-6 mb-6">
         <h3 className="text-xl font-semibold mb-4">Leads</h3>
-        <LeadFilter onSearch={handleSearch} onFilter={handleFilter} />
+        <LeadFilter
+          onSearch={handleSearch}
+          onFilter={handleFilter}
+          configuration={configuration}
+        />
         {isLoadingLeads ? (
           <Skeleton className="h-96" />
         ) : errorLeads ? (
           <div className="text-red-500">Error loading leads.</div>
         ) : (
-          <LeadTable leads={filteredLeads} />
+          <LeadTable
+            leads={filteredLeads}
+            onEdit={(lead) => {
+              console.log("Editing lead:", lead);
+            }}
+            onDelete={(id) => {
+              console.log("Deleting lead:", id);
+            }}
+            onStatusChange={(id, status) => {
+              console.log("Updating lead status:", id, status);
+            }}
+          />
         )}
       </div>
       {/* Removed closing divs for layout */}

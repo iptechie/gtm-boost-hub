@@ -1,4 +1,4 @@
-import type { Lead } from "@/components/LeadTable";
+import type { Lead } from "@/types/lead";
 
 // --- Define Types ---
 export interface PipelineStage {

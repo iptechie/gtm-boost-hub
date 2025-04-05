@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query"; // Import mutation hooks
+import React, { useState, useRef, useEffect } from "react"; // Import useRef and useEffect
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Table,
   TableBody,
@@ -11,13 +11,10 @@ import {
 import {
   Edit,
   Trash,
-  MessageCircle, // WhatsApp icon
-  MoreHorizontal, // Dropdown trigger
-  MapPin, // Location icon
-  Slack, // Slack icon
-  History, // Activity Log icon
-  Eye, // Quick View icon
-  AlertCircle, // Delete confirmation icon
+  MessageCircle,
+  MoreHorizontal,
+  History,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -50,45 +47,19 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetClose,
-} from "@/components/ui/sheet";
-import { deleteLead } from "@/lib/api";
-import LeadActivityLog from "./LeadActivityLog"; // Import the new component
-import LeadQuickViewSheet from "./LeadQuickViewSheet"; // Import the new component
-
-export interface Lead {
-  id: string;
-  name: string;
-  designation?: string;
-  company: string;
-  contactInfo: {
-    email: string;
-    phone: string;
-  };
-  location?: string;
-  value?: number;
-  status: string; // Represents the pipeline stage ID
-  category?: string;
-  industry?: string;
-  lastContact: string;
-  nextFollowUp: string;
-  score: number;
-  slackUrl?: string; // Added optional Slack URL field
-}
+import { deleteLead, updateLead } from "@/lib/api";
+import LeadActivityLog from "./LeadActivityLog";
+import LeadQuickViewSheet from "./LeadQuickViewSheet";
+import type { Lead } from "@/types/lead";
+import { format, parseISO } from "date-fns";
 
 interface LeadTableProps {
   leads: Lead[];
+  onEdit?: (lead: Lead) => void;
+  onDelete?: (id: string) => void;
+  onStatusChange?: (id: string, status: Lead["status"]) => void;
 }
-
-// Removed inline component definitions
 
 const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
@@ -102,31 +73,35 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
   const [quickViewOpen, setQuickViewOpen] = useState(false);
   const [leadForQuickView, setLeadForQuickView] = useState<Lead | null>(null);
 
-  const queryClient = useQueryClient(); // Get query client instance
+  const queryClient = useQueryClient();
 
-  // Mutation for deleting a lead
   const deleteMutation = useMutation({
-    mutationFn: deleteLead, // Use the API function
-    onSuccess: (_, deletedLeadId) => {
+    mutationFn: deleteLead,
+    onSuccess: () => {
       toast.success(`Lead deleted successfully.`);
-      queryClient.invalidateQueries({ queryKey: ["leads"] }); // Refetch leads list
-      setLeadToDelete(null); // Clear the lead marked for deletion
-      setDeleteConfirmOpen(false); // Close the dialog
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      setLeadToDelete(null);
+      setDeleteConfirmOpen(false);
     },
-    onError: (error, deletedLeadId) => {
+    onError: (error: Error) => {
       toast.error(`Failed to delete lead: ${error.message}`);
       console.error("Delete error:", error);
-      setLeadToDelete(null); // Clear the lead even on error
-      setDeleteConfirmOpen(false); // Close the dialog
+      setLeadToDelete(null);
+      setDeleteConfirmOpen(false);
     },
   });
 
-  const getStatusBadge = (status: string) => {
-    // Badge logic remains the same...
+  const getStatusBadge = (status: Lead["status"]) => {
     switch (status) {
       case "New":
         return (
           <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200">
+            {status}
+          </Badge>
+        );
+      case "Contacted":
+        return (
+          <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200">
             {status}
           </Badge>
         );
@@ -136,62 +111,65 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
             {status}
           </Badge>
         );
-      case "Won":
+      case "Proposal":
         return (
-          <Badge className="bg-green-100 text-green-700 hover:bg-green-200">
+          <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200">
             {status}
           </Badge>
         );
-      case "Lost":
+      case "Negotiation":
         return (
-          <Badge className="bg-red-100 text-red-700 hover:bg-red-200">
+          <Badge className="bg-pink-100 text-pink-700 hover:bg-pink-200">
+            {status}
+          </Badge>
+        );
+      case "Closed":
+        return (
+          <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-200">
             {status}
           </Badge>
         );
       default:
+        console.warn(`Unknown lead status encountered: ${status}`);
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  const getScoreColor = (score: number) => {
+  const getScoreColor = (score: number | undefined) => {
+    if (score === undefined) return "text-gray-500";
     if (score >= 80) return "text-green-600";
     if (score >= 50) return "text-amber-600";
     return "text-red-600";
   };
 
-  const handleSelectAll = () => {
-    if (selectedLeads.length === leads.length) {
-      setSelectedLeads([]);
+  const handleSelectAll = (checked: boolean | "indeterminate") => {
+    setSelectedLeads(checked === true ? leads.map((lead) => lead.id) : []);
+  };
+
+  const handleSelectLead = (id: string, checked: boolean | "indeterminate") => {
+    if (checked === true) {
+      setSelectedLeads((prev) => [...prev, id]);
     } else {
-      setSelectedLeads(leads.map((lead) => lead.id));
+      setSelectedLeads((prev) => prev.filter((leadId) => leadId !== id));
     }
   };
 
-  const handleSelectLead = (id: string) => {
-    if (selectedLeads.includes(id)) {
-      setSelectedLeads(selectedLeads.filter((leadId) => leadId !== id));
-    } else {
-      setSelectedLeads([...selectedLeads, id]);
-    }
-  };
-
-  const handleUpdateStage = (stage: string, leadId?: string) => {
-    // Mock update logic
+  const handleUpdateStage = (stage: Lead["status"], leadId?: string) => {
     if (leadId) {
-      toast.success(`Updated lead ${leadId} to stage: ${stage} (mock).`);
-      // TODO: Add mutation call here
+      toast.info(`Updating lead ${leadId} to stage: ${stage} (mock).`);
+      // TODO: Add mutation call: updateLeadMutation.mutate({ id: leadId, status: stage })
     } else {
-      toast.success(
-        `Updated ${selectedLeads.length} leads to stage: ${stage} (mock).`
+      toast.info(
+        `Updating ${selectedLeads.length} leads to stage: ${stage} (mock).`
       );
-      // TODO: Add bulk mutation call here
+      // TODO: Add bulk mutation call
       setSelectedLeads([]);
     }
   };
 
   const handleDeleteSelected = () => {
+    toast.info(`Deleting ${selectedLeads.length} leads (mock).`);
     // TODO: Implement bulk delete confirmation and mutation
-    toast.success(`Deleted ${selectedLeads.length} leads (mock).`);
     setSelectedLeads([]);
   };
 
@@ -205,16 +183,14 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
     setDeleteConfirmOpen(true);
   };
 
-  // Updated confirmDelete to use the mutation
   const confirmDelete = () => {
     if (leadToDelete) {
-      deleteMutation.mutate(leadToDelete.id); // Call the mutation
+      deleteMutation.mutate(leadToDelete.id);
     }
   };
 
   const handleViewActivity = (lead: Lead) => {
-    // Set the ID and name, not the whole lead object
-    setLeadForActivity(lead); // Keep setting the full lead temporarily for the name prop
+    setLeadForActivity(lead);
     setActivityLogOpen(true);
   };
 
@@ -223,24 +199,96 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
     setQuickViewOpen(true);
   };
 
-  const handleWhatsApp = (phone: string) => {
+  const handleWhatsApp = (phone: string | undefined) => {
+    if (!phone) {
+      toast.error("No phone number available for this lead.");
+      return;
+    }
     const url = `https://wa.me/${phone.replace(/[^0-9]/g, "")}`;
     window.open(url, "_blank");
     toast.success("Opening WhatsApp");
   };
 
-  // Assuming stage options might come from API/context later
-  const stageOptions = [
+  const stageOptions: Lead["status"][] = [
     "New",
     "Contacted",
     "Qualified",
-    "Discovery Meeting",
-    "Demo",
     "Proposal",
     "Negotiation",
-    "Won",
-    "Lost",
+    "Closed",
   ];
+
+  const isAllSelected =
+    selectedLeads.length === leads.length && leads.length > 0;
+  const isIndeterminate =
+    selectedLeads.length > 0 && selectedLeads.length < leads.length;
+
+  // Ref for the header checkbox
+  const headerCheckboxRef = useRef<HTMLButtonElement>(null); // Ref for the shadcn Checkbox component
+
+  // Effect to set indeterminate state using the data-state attribute
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      // Set data-state attribute for CSS styling, which shadcn/ui uses
+      headerCheckboxRef.current.setAttribute(
+        "data-state",
+        isIndeterminate
+          ? "indeterminate"
+          : isAllSelected
+          ? "checked"
+          : "unchecked"
+      );
+    }
+  }, [isIndeterminate, isAllSelected]);
+
+  // Helper function to format date as "6th April, 2025"
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return "N/A";
+
+    try {
+      // First try to parse as ISO date
+      let date;
+      try {
+        date = parseISO(dateString);
+      } catch (e) {
+        // If ISO parsing fails, try to parse as YYYY-MM-DD
+        const parts = dateString.split("-");
+        if (parts.length === 3) {
+          date = new Date(
+            parseInt(parts[0]),
+            parseInt(parts[1]) - 1,
+            parseInt(parts[2])
+          );
+        } else {
+          throw new Error("Invalid date format");
+        }
+      }
+
+      const day = date.getDate();
+      const month = format(date, "MMMM");
+      const year = date.getFullYear();
+
+      // Add ordinal suffix to day
+      const ordinalSuffix = (day: number) => {
+        if (day > 3 && day < 21) return "th";
+        switch (day % 10) {
+          case 1:
+            return "st";
+          case 2:
+            return "nd";
+          case 3:
+            return "rd";
+          default:
+            return "th";
+        }
+      };
+
+      return `${day}${ordinalSuffix(day)} ${month}, ${year}`;
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return dateString; // Return original string if parsing fails
+    }
+  };
 
   return (
     <>
@@ -252,20 +300,19 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
             onDeleteSelected={handleDeleteSelected}
           />
         </div>
-        {/* Other header elements if needed */}
       </div>
 
-      <div className="glass-card overflow-hidden">
+      <div className="glass-card overflow-hidden border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-10">
                 <Checkbox
+                  ref={headerCheckboxRef}
                   className="rounded-sm"
-                  checked={
-                    selectedLeads.length === leads.length && leads.length > 0
-                  }
+                  checked={isAllSelected}
                   onCheckedChange={handleSelectAll}
+                  aria-label="Select all rows"
                 />
               </TableHead>
               <TableHead>NAME</TableHead>
@@ -279,184 +326,201 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {leads.map((lead) => (
-              <TableRow key={lead.id} className="table-row-hover">
-                <TableCell>
-                  <Checkbox
-                    className="rounded-sm"
-                    checked={selectedLeads.includes(lead.id)}
-                    onCheckedChange={() => handleSelectLead(lead.id)}
-                  />
-                </TableCell>
-                <TableCell>
-                  <div>
-                    <div className="font-medium">{lead.name}</div>
-                    {lead.designation && (
-                      <div className="text-xs text-slate-500">
-                        {lead.designation}
-                      </div>
-                    )}
-                    <div className="text-sm text-slate-500 mt-1">
-                      {lead.company}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="space-y-1">
-                    <div className="text-sm">{lead.contactInfo.email}</div>
-                    <div className="text-sm text-slate-500">
-                      {lead.contactInfo.phone}
-                    </div>
-                    {lead.location && (
-                      <div className="text-xs text-slate-500 mt-1 flex items-center">
-                        <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                        <span>{lead.location}</span>
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>{lead.category || "N/A"}</TableCell>
-                <TableCell>
-                  <Select
-                    defaultValue={lead.status}
-                    onValueChange={(value) => handleUpdateStage(value, lead.id)}
-                  >
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue>{getStatusBadge(lead.status)}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {stageOptions.map((stage) => (
-                        <SelectItem key={stage} value={stage}>
-                          {stage}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell>{lead.lastContact}</TableCell>
-                <TableCell>{lead.nextFollowUp}</TableCell>
-                <TableCell>
-                  <span className={`font-medium ${getScoreColor(lead.score)}`}>
-                    {lead.score}%
-                  </span>
-                </TableCell>
-                {/* Add stopPropagation and preventDefault to the TableCell */}
-                <TableCell
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                  }}
-                >
-                  <DropdownMenu>
-                    {/* Remove asChild and the inner Button */}
-                    <DropdownMenuTrigger
-                      onClick={(e) => e.stopPropagation()} // Keep stopPropagation just in case
-                      className="p-2 rounded hover:bg-gray-100" // Add basic styling
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                      <span className="sr-only">Open menu</span>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      {/* Slack Button - Conditional */}
-                      {lead.slackUrl && (
-                        <DropdownMenuItem
-                          onClick={() => window.open(lead.slackUrl, "_blank")}
-                        >
-                          <Slack className="mr-2 h-4 w-4" />
-                          <span>Open Slack</span>
-                        </DropdownMenuItem>
-                      )}
-                      {/* View Activity Button */}
-                      <DropdownMenuItem
-                        onClick={() => handleViewActivity(lead)}
-                      >
-                        <History className="mr-2 h-4 w-4" />
-                        <span>View Activity</span>
-                      </DropdownMenuItem>
-                      {/* Quick View Button */}
-                      <DropdownMenuItem onClick={() => handleQuickView(lead)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        <span>Quick View</span>
-                      </DropdownMenuItem>
-                      {/* WhatsApp Button */}
-                      <DropdownMenuItem
-                        onClick={() => handleWhatsApp(lead.contactInfo.phone)}
-                        className="text-green-600 focus:text-green-700"
-                      >
-                        <MessageCircle className="mr-2 h-4 w-4" />
-                        <span>WhatsApp</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      {/* Edit Button */}
-                      <DropdownMenuItem onClick={() => handleEdit(lead)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        <span>Edit</span>
-                      </DropdownMenuItem>
-                      {/* Delete Button - Removed AlertDialogTrigger again */}
-                      <DropdownMenuItem
-                        // onSelect={(e) => e.preventDefault()} // Keep dropdown open if needed later
-                        onClick={() => handleDeleteClick(lead)} // Directly call handler
-                        className="text-red-500 focus:text-red-700"
-                      >
-                        <Trash className="mr-2 h-4 w-4" />
-                        <span>Delete</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {leads.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center">
+                  No leads found.
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              leads.map((lead) => (
+                <TableRow
+                  key={lead.id}
+                  data-state={selectedLeads.includes(lead.id) ? "selected" : ""}
+                >
+                  <TableCell>
+                    <Checkbox
+                      className="rounded-sm"
+                      checked={selectedLeads.includes(lead.id)}
+                      onCheckedChange={(checked) =>
+                        handleSelectLead(lead.id, checked)
+                      }
+                      aria-label={`Select row for ${lead.name}`}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{lead.name}</div>
+                      {lead.title && (
+                        <div className="text-xs text-slate-500">
+                          {lead.title}
+                        </div>
+                      )}
+                      <div className="text-sm text-slate-500 mt-1">
+                        {lead.company}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="text-sm">{lead.email}</div>
+                      <div className="text-sm text-slate-500">{lead.phone}</div>
+                      {lead.location && (
+                        <div className="text-xs text-slate-500 mt-1 flex items-center">
+                          <span>{lead.location}</span>
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>{lead.category || "N/A"}</TableCell>
+                  <TableCell>
+                    <Select
+                      defaultValue={lead.status}
+                      onValueChange={(value) =>
+                        handleUpdateStage(value as Lead["status"], lead.id)
+                      }
+                    >
+                      <SelectTrigger className="w-[140px] h-8 text-xs">
+                        <SelectValue>{getStatusBadge(lead.status)}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stageOptions.map((stage) => (
+                          <SelectItem
+                            key={stage}
+                            value={stage}
+                            className="text-xs"
+                          >
+                            {stage}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell>{formatDate(lead.lastContact)}</TableCell>
+                  <TableCell>{formatDate(lead.nextFollowUp)}</TableCell>
+                  <TableCell>
+                    <span
+                      className={`font-medium ${getScoreColor(lead.score)}`}
+                    >
+                      {lead.score || "N/A"}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-[160px]">
+                        <DropdownMenuItem
+                          className="cursor-pointer flex items-center"
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            handleQuickView(lead);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Quick View
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="cursor-pointer flex items-center"
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            handleViewActivity(lead);
+                          }}
+                        >
+                          <History className="h-4 w-4 mr-2" />
+                          View Activity
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="cursor-pointer flex items-center"
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            handleEdit(lead);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="cursor-pointer flex items-center"
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            handleWhatsApp(lead.phone);
+                          }}
+                        >
+                          <MessageCircle className="h-4 w-4 mr-2" />
+                          WhatsApp
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="cursor-pointer flex items-center text-red-600"
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            handleDeleteClick(lead);
+                          }}
+                        >
+                          <Trash className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
 
-      {/* Dialogs and Sheets */}
-      <AddLeadDialog open={addLeadOpen} onOpenChange={setAddLeadOpen} />
-      <EditLeadDialog
-        open={editLeadOpen}
-        onOpenChange={setEditLeadOpen}
-        lead={currentLead}
-      />
+      {currentLead && (
+        <EditLeadDialog
+          lead={currentLead}
+          open={editLeadOpen}
+          onOpenChange={setEditLeadOpen}
+        />
+      )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              lead "{leadToDelete?.name}".
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setLeadToDelete(null)}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {leadToDelete && (
+        <AlertDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {leadToDelete.name}? This action
+                cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete}>
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
-      {/* Activity Log Sheet - Pass leadId and leadName */}
-      <LeadActivityLog
-        leadId={leadForActivity?.id ?? null}
-        leadName={leadForActivity?.name ?? null}
-        open={activityLogOpen}
-        onOpenChange={setActivityLogOpen}
-      />
+      {leadForActivity && (
+        <LeadActivityLog
+          leadId={leadForActivity.id}
+          leadName={leadForActivity.name}
+          open={activityLogOpen}
+          onOpenChange={setActivityLogOpen}
+        />
+      )}
 
-      {/* Quick View Sheet */}
-      <LeadQuickViewSheet
-        lead={leadForQuickView}
-        open={quickViewOpen}
-        onOpenChange={setQuickViewOpen}
-      />
+      {leadForQuickView && (
+        <LeadQuickViewSheet
+          lead={leadForQuickView}
+          open={quickViewOpen}
+          onOpenChange={setQuickViewOpen}
+        />
+      )}
     </>
   );
 };

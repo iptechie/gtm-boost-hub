@@ -11,8 +11,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"; /
 import {
   fetchLeadActivity,
   addLeadActivity,
+  updateLead,
   ActivityLogEntry,
-} from "@/lib/api"; // Import addLeadActivity
+} from "@/lib/api"; // Import addLeadActivity and updateLead
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, parseISO } from "date-fns";
 import {
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/select"; // Import Select components
 import { Textarea } from "@/components/ui/textarea"; // Import Textarea
 import { Label } from "@/components/ui/label"; // Import Label
+import { Input } from "@/components/ui/input"; // Import Input
 import { toast } from "sonner"; // Import toast
 import {
   AlertCircle,
@@ -81,6 +83,7 @@ const LeadActivityLog: React.FC<LeadActivityLogProps> = ({
   const [newActivityType, setNewActivityType] =
     useState<ActivityLogEntry["type"]>("Note"); // Default to Note
   const [newActivityDetails, setNewActivityDetails] = useState("");
+  const [nextFollowUpDate, setNextFollowUpDate] = useState("");
 
   // Fetch activity data
   const {
@@ -105,10 +108,23 @@ const LeadActivityLog: React.FC<LeadActivityLogProps> = ({
       // Reset form
       setNewActivityType("Note");
       setNewActivityDetails("");
+      setNextFollowUpDate("");
     },
     onError: (error) => {
       toast.error(`Failed to add activity: ${error.message}`);
       console.error("Add activity error:", error);
+    },
+  });
+
+  // Mutation for updating lead with next follow-up date
+  const updateLeadMutation = useMutation({
+    mutationFn: updateLead,
+    onSuccess: () => {
+      toast.success("Next follow-up date updated successfully.");
+      queryClient.invalidateQueries({ queryKey: ["leads"] }); // Refetch leads
+    },
+    onError: (error) => {
+      toast.error(`Failed to update next follow-up date: ${error.message}`);
     },
   });
 
@@ -118,10 +134,25 @@ const LeadActivityLog: React.FC<LeadActivityLogProps> = ({
       toast.warning("Please select a type and enter details.");
       return;
     }
+
+    // Add the activity
     addActivityMutation.mutate({
       type: newActivityType,
       details: newActivityDetails.trim(),
     });
+
+    // Update the lead with next follow-up date and last contact date
+    if (leadId) {
+      // Get current date in local timezone
+      const now = new Date();
+      const today = now.toLocaleDateString("en-CA"); // Format as YYYY-MM-DD in local timezone
+
+      updateLeadMutation.mutate({
+        id: leadId,
+        lastContact: today,
+        ...(nextFollowUpDate ? { nextFollowUp: nextFollowUpDate } : {}),
+      });
+    }
   };
 
   // Determine the title safely
@@ -129,78 +160,64 @@ const LeadActivityLog: React.FC<LeadActivityLogProps> = ({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-lg">
-        {" "}
-        {/* Adjust width if needed */}
+      <SheetContent className="sm:max-w-lg flex flex-col h-full">
         <SheetHeader>
           <SheetTitle>{sheetTitle}</SheetTitle>
           <SheetDescription>
             History of interactions and notes for this lead.
           </SheetDescription>
         </SheetHeader>
-        <div className="py-4 space-y-4 overflow-y-auto max-h-[calc(100vh-150px)]">
-          {" "}
-          {/* Add scroll */}
+
+        {/* Activity List with Scroll */}
+        <div className="flex-1 overflow-y-auto py-4">
           {isLoading ? (
-            // Show skeletons while loading
             <>
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
             </>
           ) : error ? (
-            // Show error message
             <div className="flex items-center text-red-600">
               <AlertCircle className="h-5 w-5 mr-2" />
               <span>Error loading activity: {error.message}</span>
             </div>
           ) : activities && activities.length > 0 ? (
-            // Display activities
-            activities
-              .sort(
-                (a, b) =>
-                  parseISO(b.timestamp).getTime() -
-                  parseISO(a.timestamp).getTime()
-              ) // Sort descending by timestamp
-              .map((activity) => (
-                <div
-                  key={activity.id}
-                  className="flex items-start text-sm border-b pb-2 last:border-b-0"
-                >
-                  {getActivityIcon(activity.type)}
-                  <div className="flex-1">
-                    <p className="font-medium">{activity.type}</p>
-                    <p className="text-slate-700">{activity.details}</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {format(
-                        parseISO(activity.timestamp),
-                        "MMM d, yyyy 'at' h:mm a"
-                      )}
-                      {activity.userId && ` by ${activity.userId}`}
-                    </p>
+            <div className="space-y-4">
+              {activities
+                .sort(
+                  (a, b) =>
+                    parseISO(b.timestamp).getTime() -
+                    parseISO(a.timestamp).getTime()
+                )
+                .map((activity) => (
+                  <div
+                    key={activity.id}
+                    className="flex items-start text-sm border-b pb-2 last:border-b-0"
+                  >
+                    {getActivityIcon(activity.type)}
+                    <div className="flex-1">
+                      <p className="font-medium">{activity.type}</p>
+                      <p className="text-slate-700">{activity.details}</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {format(
+                          parseISO(activity.timestamp),
+                          "MMM d, yyyy 'at' h:mm a"
+                        )}
+                        {activity.userId && ` by ${activity.userId}`}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+            </div>
           ) : (
-            // Show message if no activities found
             <p className="text-slate-500 text-center py-5">
               No activity recorded for this lead yet.
             </p>
           )}
         </div>
-        <div className="mt-auto pt-4 border-t">
-          {" "}
-          {/* Footer with close button */}
-          <Button
-            onClick={() => onOpenChange(false)}
-            variant="outline"
-            className="w-full"
-          >
-            Close
-          </Button>
-        </div>
+
         {/* Add Activity Form */}
-        <div className="mt-6 pt-4 border-t">
+        <div className="border-t pt-4 mt-auto">
           <form onSubmit={handleAddActivity} className="space-y-4">
             <h4 className="font-medium text-slate-700">Add New Activity</h4>
             <div className="space-y-2">
@@ -217,31 +234,49 @@ const LeadActivityLog: React.FC<LeadActivityLogProps> = ({
                 <SelectContent>
                   {activityTypes.map((type) => (
                     <SelectItem key={type} value={type}>
-                      {type}
+                      <div className="flex items-center">
+                        {getActivityIcon(type)}
+                        {type}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="activity-details">Details</Label>
               <Textarea
                 id="activity-details"
-                placeholder="Enter details about the activity..."
                 value={newActivityDetails}
                 onChange={(e) => setNewActivityDetails(e.target.value)}
-                rows={3}
-                required
+                placeholder="Enter activity details..."
+                className="h-20"
               />
             </div>
-            <Button
-              type="submit"
-              disabled={
-                addActivityMutation.isPending || !newActivityDetails.trim()
-              }
-            >
-              {addActivityMutation.isPending ? "Adding..." : "Add Activity"}
-            </Button>
+
+            <div className="space-y-2">
+              <Label htmlFor="next-followup">Next Follow-up Date</Label>
+              <Input
+                id="next-followup"
+                type="date"
+                value={nextFollowUpDate}
+                onChange={(e) => setNextFollowUpDate(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button type="submit" className="flex-1">
+                Add Activity
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Close
+              </Button>
+            </div>
           </form>
         </div>
       </SheetContent>

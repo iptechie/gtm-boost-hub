@@ -2,7 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ConfigProvider } from "./contexts/ConfigContext";
+import { LeadConfigurationProvider } from "./contexts/LeadConfigurationContext";
 import MainLayout from "./layouts/MainLayout"; // Import the new layout
 import Index from "./pages/Index";
 import SignUp from "./pages/SignUp";
@@ -21,53 +24,105 @@ import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import ProfileCreation from "./pages/ProfileCreation";
 import FollowUpPage from "./pages/FollowUpPage"; // Import the new page
 import NotFound from "./pages/NotFound";
+import Settings from "@/pages/Settings";
+import { Provider } from "jotai";
 
 const queryClient = new QueryClient();
+
+// Protected Route Component
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  // For development, always allow access
+  return <>{children}</>;
+};
+
+// Admin Route Component
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  // For development, always allow access
+  return <>{children}</>;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          {/* Routes outside the main layout */}
-          <Route path="/" element={<Index />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/admin/organization" element={<OrgAdminDashboard />} />
-          <Route path="/admin/super" element={<SuperAdminDashboard />} />
-          <Route path="/create-profile" element={<ProfileCreation />} />
+      <Provider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <ConfigProvider>
+              <LeadConfigurationProvider>
+                <Routes>
+                  {/* Public Routes */}
+                  <Route path="/" element={<Index />} />
+                  <Route path="/signup" element={<SignUp />} />
 
-          {/* Routes using the main layout */}
-          <Route element={<MainLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/leads" element={<LeadsPage />} />
-            <Route path="/pipeline" element={<PipelinePage />} />
-            <Route path="/gtm-strategy" element={<GTMStrategyPage />} />
-            <Route path="/mail-planner" element={<MailPlannerPage />} />
-            <Route path="/ai-insights" element={<AIInsightsPage />} />
-            <Route path="/follow-up" element={<FollowUpPage />} />{" "}
-            {/* Add follow-up route */}
-            {/* Add settings routes */}
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route
-              path="/settings/lead-scoring"
-              element={<LeadScoringSettingsPage />}
-            />
-            <Route
-              path="/settings/custom-lead-fields"
-              element={<CustomLeadFieldsSettingsPage />}
-            />
-            <Route
-              path="/settings/dashboard"
-              element={<DashboardSettingsPage />}
-            />
-          </Route>
+                  {/* Protected Routes */}
+                  <Route
+                    element={
+                      <ProtectedRoute>
+                        <MainLayout />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/leads" element={<LeadsPage />} />
+                    <Route path="/pipeline" element={<PipelinePage />} />
+                    <Route path="/gtm-strategy" element={<GTMStrategyPage />} />
+                    <Route path="/mail-planner" element={<MailPlannerPage />} />
+                    <Route path="/ai-insights" element={<AIInsightsPage />} />
+                    <Route path="/follow-up" element={<FollowUpPage />} />
+                    {/* Add settings routes */}
+                    <Route
+                      path="/settings"
+                      element={
+                        <ProtectedRoute>
+                          <Settings />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/settings/lead-scoring"
+                      element={<LeadScoringSettingsPage />}
+                    />
+                    <Route
+                      path="/settings/custom-fields"
+                      element={<CustomLeadFieldsSettingsPage />}
+                    />
+                    <Route
+                      path="/settings/dashboard"
+                      element={<DashboardSettingsPage />}
+                    />
+                  </Route>
 
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+                  {/* Admin Routes */}
+                  <Route
+                    element={
+                      <AdminRoute>
+                        <MainLayout />
+                      </AdminRoute>
+                    }
+                  >
+                    <Route path="/admin/org" element={<OrgAdminDashboard />} />
+                    <Route
+                      path="/admin/super"
+                      element={<SuperAdminDashboard />}
+                    />
+                  </Route>
+
+                  {/* Profile Creation Route */}
+                  <Route
+                    path="/profile-creation"
+                    element={<ProfileCreation />}
+                  />
+
+                  {/* 404 Route */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </LeadConfigurationProvider>
+            </ConfigProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </Provider>
     </TooltipProvider>
   </QueryClientProvider>
 );
