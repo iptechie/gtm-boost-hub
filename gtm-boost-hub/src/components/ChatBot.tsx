@@ -317,9 +317,9 @@ export const ChatBot = () => {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="absolute bottom-16 right-0 w-96 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
+        <div className="absolute bottom-16 right-0 w-96 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden max-h-[600px]">
           {/* Header */}
-          <div className="bg-[#4F46E5] p-4 text-white flex items-center gap-2">
+          <div className="bg-[#4F46E5] p-3 text-white flex items-center gap-2">
             <Bot className="h-6 w-6" />
             <div>
               <h3 className="font-semibold">GTMCentric Assistant</h3>
@@ -330,7 +330,7 @@ export const ChatBot = () => {
           </div>
 
           {/* Messages */}
-          <div className="h-96 overflow-y-auto p-4 space-y-4">
+          <div className="h-64 overflow-y-auto p-4 space-y-4">
             {messages.map((message, index) => (
               <div
                 key={index}
