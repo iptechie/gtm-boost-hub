@@ -23,6 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FeatureGate } from "@/components/FeatureGate";
+import { Progress } from "@/components/ui/progress";
 
 // Icons
 import {
@@ -40,6 +41,7 @@ import {
   MessageSquare,
   FileText,
   Link,
+  TrendingUp,
 } from "lucide-react";
 
 interface LeadEmailsProps {
@@ -52,6 +54,11 @@ const LeadEmails: React.FC<LeadEmailsProps> = ({ leadId }) => {
   const [selectedEmail, setSelectedEmail] = useState<EmailMessage | null>(null);
   const [suggestedTemplates, setSuggestedTemplates] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>("all");
+  const [analysisResults, setAnalysisResults] = useState<{
+    sentiment: "positive" | "negative" | "neutral";
+    intent: "interested" | "not_interested" | "needs_more_info" | "unknown";
+    suggestedScore: number;
+  } | null>(null);
 
   useEffect(() => {
     const fetchEmails = async () => {
@@ -77,6 +84,27 @@ const LeadEmails: React.FC<LeadEmailsProps> = ({ leadId }) => {
 
     fetchEmails();
   }, [leadId]);
+
+  useEffect(() => {
+    const analyzeSelectedEmail = async () => {
+      if (selectedEmail) {
+        try {
+          const analysis = await emailIntegrationService.analyzeEmail(
+            selectedEmail
+          );
+          setAnalysisResults(analysis);
+
+          // Update lead score based on the email
+          await emailIntegrationService.updateLeadScore(leadId, selectedEmail);
+        } catch (error) {
+          console.error("Error analyzing email:", error);
+          toast.error("Failed to analyze email");
+        }
+      }
+    };
+
+    analyzeSelectedEmail();
+  }, [selectedEmail, leadId]);
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -206,7 +234,7 @@ const LeadEmails: React.FC<LeadEmailsProps> = ({ leadId }) => {
 
   return (
     <FeatureGate
-      feature="email"
+      integrationFeature="email"
       fallback={
         <Alert variant="destructive" className="mb-6">
           <AlertTriangle className="h-4 w-4" />
@@ -237,200 +265,193 @@ const LeadEmails: React.FC<LeadEmailsProps> = ({ leadId }) => {
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Email List */}
-            <div className="md:col-span-1 border rounded-md">
-              <div className="p-2 border-b">
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="all">All</TabsTrigger>
-                    <TabsTrigger value="unread">Unread</TabsTrigger>
-                    <TabsTrigger value="starred">Starred</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-              <ScrollArea className="h-[500px]">
-                {isLoading ? (
-                  <div className="p-4 space-y-2">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <Skeleton key={i} className="h-20 w-full" />
-                    ))}
-                  </div>
-                ) : filteredEmails.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground">
-                    <Mail className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>No emails found</p>
-                  </div>
-                ) : (
-                  <div className="divide-y">
-                    {filteredEmails.map((email) => (
-                      <div
-                        key={email.id}
-                        className={`p-3 cursor-pointer hover:bg-muted ${
-                          selectedEmail?.id === email.id ? "bg-muted" : ""
-                        } ${!email.read ? "font-medium" : ""}`}
-                        onClick={() => handleEmailSelect(email)}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center">
-                              {!email.read && (
-                                <div className="w-2 h-2 rounded-full bg-primary mr-2" />
-                              )}
-                              <p className="truncate">{email.subject}</p>
-                            </div>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {email.from}
-                            </p>
-                          </div>
-                          <div className="flex items-center space-x-1 ml-2">
-                            {email.starred && (
-                              <Star className="h-4 w-4 text-yellow-500" />
-                            )}
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(email.receivedAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList>
+              <TabsTrigger value="all">All Emails</TabsTrigger>
+              <TabsTrigger value="unread">Unread</TabsTrigger>
+              <TabsTrigger value="starred">Starred</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value={activeTab}>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-1">
+                  <ScrollArea className="h-[600px]">
+                    {isLoading ? (
+                      <div className="space-y-2">
+                        <Skeleton className="h-20" />
+                        <Skeleton className="h-20" />
+                        <Skeleton className="h-20" />
                       </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
-
-            {/* Email Content */}
-            <div className="md:col-span-2 border rounded-md">
-              {isLoading ? (
-                <div className="p-4 space-y-4">
-                  <Skeleton className="h-6 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                  <Skeleton className="h-4 w-1/3" />
-                  <Separator />
-                  <Skeleton className="h-32 w-full" />
-                </div>
-              ) : selectedEmail ? (
-                <div className="p-4">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-medium">
-                        {selectedEmail.subject}
-                      </h3>
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <span>From: {selectedEmail.from}</span>
-                        <span className="mx-2">•</span>
-                        <span>
-                          {new Date(selectedEmail.receivedAt).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleToggleStarred(selectedEmail.id)}
-                    >
-                      {selectedEmail.starred ? (
-                        <Star className="h-5 w-5 text-yellow-500" />
-                      ) : (
-                        <StarOff className="h-5 w-5" />
-                      )}
-                    </Button>
-                  </div>
-
-                  <Separator className="my-4" />
-
-                  <div className="mb-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Badge variant="outline" className="flex items-center">
-                        {getSentimentIcon(selectedEmail.sentiment)}
-                        <span className="ml-1">
-                          {selectedEmail.sentiment
-                            ? selectedEmail.sentiment.charAt(0).toUpperCase() +
-                              selectedEmail.sentiment.slice(1)
-                            : "Unknown"}
-                        </span>
-                      </Badge>
-                      <Badge variant="outline" className="flex items-center">
-                        {getIntentIcon(selectedEmail.intent)}
-                        <span className="ml-1">
-                          {getIntentLabel(selectedEmail.intent)}
-                        </span>
-                      </Badge>
-                    </div>
-                  </div>
-
-                  <div className="prose max-w-none mb-6">
-                    {selectedEmail.bodyHtml ? (
-                      <div
-                        dangerouslySetInnerHTML={{
-                          __html: selectedEmail.bodyHtml,
-                        }}
-                      />
                     ) : (
-                      <p className="whitespace-pre-wrap">
-                        {selectedEmail.body}
-                      </p>
-                    )}
-                  </div>
-
-                  {selectedEmail.attachments &&
-                    selectedEmail.attachments.length > 0 && (
-                      <div className="mb-6">
-                        <h4 className="text-sm font-medium mb-2">
-                          Attachments
-                        </h4>
-                        <div className="space-y-2">
-                          {selectedEmail.attachments.map((attachment) => (
-                            <div
-                              key={attachment.id}
-                              className="flex items-center justify-between p-2 border rounded-md"
-                            >
-                              <div className="flex items-center">
-                                <FileText className="h-4 w-4 mr-2" />
-                                <span className="text-sm">
-                                  {attachment.name}
+                      <div className="space-y-2">
+                        {emails.map((email) => (
+                          <div
+                            key={email.id}
+                            className={`p-4 rounded-lg cursor-pointer ${
+                              selectedEmail?.id === email.id
+                                ? "bg-primary/10"
+                                : "hover:bg-muted"
+                            }`}
+                            onClick={() => handleEmailSelect(email)}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="font-medium">{email.subject}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {email.from}
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                {email.starred ? (
+                                  <Star className="h-4 w-4 text-yellow-500" />
+                                ) : (
+                                  <StarOff className="h-4 w-4 text-muted-foreground" />
+                                )}
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(
+                                    email.receivedAt
+                                  ).toLocaleDateString()}
                                 </span>
                               </div>
-                              <Button variant="ghost" size="sm">
-                                <Link className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                  {suggestedTemplates.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">
-                        Suggested Responses
-                      </h4>
-                      <div className="space-y-2">
-                        {suggestedTemplates.map((template, index) => (
-                          <div
-                            key={index}
-                            className="p-3 border rounded-md bg-muted/50"
-                          >
-                            <p className="text-sm">{template}</p>
-                            <div className="flex justify-end mt-2">
-                              <Button variant="outline" size="sm">
-                                Use Template
-                              </Button>
                             </div>
                           </div>
                         ))}
                       </div>
+                    )}
+                  </ScrollArea>
+                </div>
+
+                <div className="col-span-2">
+                  {selectedEmail ? (
+                    <div className="space-y-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-lg font-medium">
+                            {selectedEmail.subject}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            From: {selectedEmail.from}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleStarred(selectedEmail.id)}
+                        >
+                          {selectedEmail.starred ? (
+                            <Star className="h-4 w-4 text-yellow-500" />
+                          ) : (
+                            <StarOff className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+
+                      <Separator />
+
+                      {analysisResults && (
+                        <div className="space-y-4">
+                          <div>
+                            <h4 className="text-sm font-medium mb-2">
+                              Email Analysis
+                            </h4>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-sm text-muted-foreground">
+                                  Sentiment
+                                </p>
+                                <Badge
+                                  variant={
+                                    analysisResults.sentiment === "positive"
+                                      ? "default"
+                                      : analysisResults.sentiment === "negative"
+                                      ? "destructive"
+                                      : "secondary"
+                                  }
+                                >
+                                  {analysisResults.sentiment}
+                                </Badge>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">
+                                  Intent
+                                </p>
+                                <Badge variant="outline">
+                                  {analysisResults.intent.replace("_", " ")}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-sm font-medium">
+                                Suggested Score Change
+                              </p>
+                              <Badge variant="outline">
+                                +{analysisResults.suggestedScore}
+                              </Badge>
+                            </div>
+                            <Progress
+                              value={analysisResults.suggestedScore}
+                              className="h-2"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="prose max-w-none">
+                        <div
+                          dangerouslySetInnerHTML={{
+                            __html:
+                              selectedEmail.bodyHtml || selectedEmail.body,
+                          }}
+                        />
+                      </div>
+
+                      {selectedEmail.attachments &&
+                        selectedEmail.attachments.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium mb-2">
+                              Attachments
+                            </h4>
+                            <div className="space-y-2">
+                              {selectedEmail.attachments.map((attachment) => (
+                                <div
+                                  key={attachment.id}
+                                  className="flex items-center justify-between p-2 rounded-lg border"
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    <FileText className="h-4 w-4" />
+                                    <span className="text-sm">
+                                      {attachment.name}
+                                    </span>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      window.open(attachment.url, "_blank")
+                                    }
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-muted-foreground">
+                        Select an email to view details
+                      </p>
                     </div>
                   )}
                 </div>
-              ) : (
-                <div className="p-8 text-center text-muted-foreground">
-                  <Mail className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>Select an email to view</p>
-                </div>
-              )}
-            </div>
-          </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </FeatureGate>

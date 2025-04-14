@@ -9,6 +9,7 @@ import {
   FileText,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import Logo from "./Logo";
 
 const Navigation: React.FC = () => {
   const location = useLocation();
@@ -24,8 +25,8 @@ const Navigation: React.FC = () => {
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <Link to="/" className="text-xl font-bold text-slate-900">
-                GTM Boost Hub
+              <Link to="/" className="flex items-center">
+                <Logo />
               </Link>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">

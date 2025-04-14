@@ -3,10 +3,8 @@ import { Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query"; // Import useQuery
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
-import { Button } from "@/components/ui/button";
-import { Calendar as CalendarIcon } from "lucide-react";
 import { fetchLeads } from "../lib/api"; // Import fetchLeads
-import { Lead } from "@/components/LeadTable"; // Import Lead type
+import { Lead } from "@/types/lead"; // Import Lead type from types
 
 // Helper function to derive title from path (can be improved)
 const getTitleFromPath = (pathname: string): string => {
@@ -41,15 +39,6 @@ const MainLayout: React.FC = () => {
     console.error("Error fetching leads for layout:", error);
   }
 
-  // Placeholder for Header children, adjust as needed
-  const headerChildren =
-    pageTitle === "Dashboard" ? (
-      <Button variant="outline" className="flex items-center gap-2">
-        <CalendarIcon className="h-4 w-4" />
-        Last 30 Days
-      </Button>
-    ) : null;
-
   return (
     <div className="flex">
       {/* Pass the fetched leads data to the Sidebar */}
@@ -57,10 +46,7 @@ const MainLayout: React.FC = () => {
       <div className="flex-1 min-h-screen ml-64">
         {" "}
         {/* Ensure ml-64 matches sidebar width */}
-        <Header title={pageTitle}>
-          {/* Pass dynamic children or adjust Header component */}
-          {headerChildren}
-        </Header>
+        <Header title={pageTitle} />
         <main className="p-6 page-transition">
           {" "}
           {/* Added padding similar to Dashboard */}

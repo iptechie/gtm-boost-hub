@@ -82,7 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = async () => {
     // For development, we'll keep the user logged in
-    navigate("/");
+    navigate("/login");
   };
 
   const updateSubscription = async (tier: SubscriptionTier) => {

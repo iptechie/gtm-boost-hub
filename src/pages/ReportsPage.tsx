@@ -12,6 +12,7 @@ import {
   TrendingUp,
   PieChart,
   LineChart,
+  AlertCircle,
 } from "lucide-react";
 import {
   Card,
@@ -76,20 +77,36 @@ const ReportsPage: React.FC = () => {
   });
   const [exportFormat, setExportFormat] = useState<ExportFormat>("csv");
 
-  // Fetch leads data
-  const { data: leadsData, isLoading: isLoadingLeads } = useQuery({
+  // Fetch leads data with proper error handling
+  const {
+    data: leadsData,
+    isLoading: isLoadingLeads,
+    error: leadsError,
+  } = useQuery<Lead[]>({
     queryKey: ["leads"],
     queryFn: fetchLeads,
   });
+
+  // Log any errors for debugging
+  React.useEffect(() => {
+    if (leadsError) {
+      console.error("Error fetching leads:", leadsError);
+      toast.error("Failed to load leads data. Please try again later.");
+    }
+  }, [leadsError]);
 
   // Calculate report data based on selected report type
   const reportData = useMemo(() => {
     if (!leadsData) return [];
 
+    console.log("Processing leads data:", leadsData.length, "leads"); // Debug log
+
     const filteredLeads = leadsData.filter((lead) => {
       const leadDate = parseISO(lead.lastContact);
       return leadDate >= dateRange.from && leadDate <= dateRange.to;
     });
+
+    console.log("Filtered leads:", filteredLeads.length, "leads"); // Debug log
 
     switch (selectedReport) {
       case "lead-generation":
@@ -98,8 +115,7 @@ const ReportsPage: React.FC = () => {
           name: lead.name,
           company: lead.company || "",
           source: lead.source || "",
-          status: lead.status,
-          score: lead.score,
+          status: lead.status || "",
         }));
       case "pipeline":
         return filteredLeads.map((lead) => ({
@@ -138,6 +154,49 @@ const ReportsPage: React.FC = () => {
         return [];
     }
   }, [leadsData, selectedReport, dateRange]);
+
+  // Show loading state
+  if (isLoadingLeads) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading reports...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (leadsError) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
+          <h3 className="mt-4 text-lg font-semibold">Error Loading Reports</h3>
+          <p className="mt-2 text-muted-foreground">
+            There was a problem loading the reports data. Please try again
+            later.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state
+  if (!leadsData || leadsData.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <FileText className="h-12 w-12 text-muted-foreground mx-auto" />
+          <h3 className="mt-4 text-lg font-semibold">No Reports Available</h3>
+          <p className="mt-2 text-muted-foreground">
+            There are no leads data available to generate reports.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Handle report export
   const handleExport = async (format: ExportFormat) => {
@@ -303,7 +362,6 @@ const ReportsPage: React.FC = () => {
                     <TableHead>Company</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Score</TableHead>
                   </>
                 )}
                 {selectedReport === "pipeline" && (

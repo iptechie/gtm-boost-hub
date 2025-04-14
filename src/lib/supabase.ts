@@ -1,4 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, Provider } from "@supabase/supabase-js";
+import { Database } from "@/types/supabase";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -8,7 +9,169 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create a single supabase client for interacting with your database
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+
+// Authentication types
+export type AuthProvider = Provider;
+export type UserRole = "admin" | "org_admin" | "user";
+export type SubscriptionTier = "free" | "basic" | "professional" | "enterprise";
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  organization_id?: string;
+  subscription_tier: SubscriptionTier;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  subscription_tier: SubscriptionTier;
+  max_users: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Helper function to get the appropriate redirect URL for OAuth
+const getOAuthRedirectUrl = () => {
+  // If we're in development, use localhost
+  if (import.meta.env.DEV) {
+    return `${window.location.origin}/auth/callback`;
+  }
+  // In production, use the Supabase URL
+  return `${supabaseUrl}/auth/callback`;
+};
+
+// Authentication functions
+export const signInWithProvider = async (provider: Provider) => {
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: getOAuthRedirectUrl(),
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
+      },
+    });
+
+    if (error) {
+      console.error(`${provider} sign in error:`, error);
+      return { data: null, error };
+    }
+
+    return { data, error };
+  } catch (error) {
+    console.error(`Unexpected error during ${provider} sign in:`, error);
+    return { data: null, error };
+  }
+};
+
+export const signUpWithEmail = async (
+  email: string,
+  password: string,
+  userType: "single" | "company"
+) => {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        user_type: userType,
+      },
+      emailRedirectTo: getOAuthRedirectUrl(),
+    },
+  });
+  return { data, error };
+};
+
+export const signOut = async () => {
+  const { error } = await supabase.auth.signOut();
+  return { error };
+};
+
+export const signInWithEmail = async (email: string, password: string) => {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+  return { data, error };
+};
+
+// User profile functions
+export const createUserProfile = async (
+  profile: Omit<UserProfile, "id" | "created_at" | "updated_at">
+) => {
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .insert([profile])
+    .select()
+    .single();
+  return { data, error };
+};
+
+export const getUserProfile = async (userId: string) => {
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("*")
+    .eq("id", userId)
+    .single();
+  return { data, error };
+};
+
+// Organization functions
+export const createOrganization = async (
+  org: Omit<Organization, "id" | "created_at" | "updated_at">
+) => {
+  const { data, error } = await supabase
+    .from("organizations")
+    .insert([org])
+    .select()
+    .single();
+  return { data, error };
+};
+
+export const getOrganization = async (orgId: string) => {
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("*")
+    .eq("id", orgId)
+    .single();
+  return { data, error };
+};
+
+// Subscription functions
+export const updateSubscription = async (
+  userId: string,
+  tier: SubscriptionTier
+) => {
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .update({ subscription_tier: tier })
+    .eq("id", userId)
+    .select()
+    .single();
+  return { data, error };
+};
+
+export const updateOrgSubscription = async (
+  orgId: string,
+  tier: SubscriptionTier,
+  maxUsers: number
+) => {
+  const { data, error } = await supabase
+    .from("organizations")
+    .update({ subscription_tier: tier, max_users: maxUsers })
+    .eq("id", orgId)
+    .select()
+    .single();
+  return { data, error };
+};
 
 // Helper functions for user management
 export const fetchUsers = async () => {
@@ -18,9 +181,12 @@ export const fetchUsers = async () => {
   return data;
 };
 
-export const updateUser = async (userId: string, updates: any) => {
+export const updateUser = async (
+  userId: string,
+  updates: Partial<Database["public"]["Tables"]["user_profiles"]["Update"]>
+) => {
   const { data, error } = await supabase
-    .from("users")
+    .from("user_profiles")
     .update(updates)
     .eq("id", userId);
 

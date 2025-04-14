@@ -18,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Header: React.FC<{ title: string; children?: React.ReactNode }> = ({
   title,
@@ -27,6 +28,7 @@ const Header: React.FC<{ title: string; children?: React.ReactNode }> = ({
   const location = useLocation();
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationLeads, setNotificationLeads] = useState<Lead[]>([]);
+  const { logout } = useAuth();
 
   // Event listener for notifications
   useEffect(() => {
@@ -104,9 +106,7 @@ const Header: React.FC<{ title: string; children?: React.ReactNode }> = ({
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate("/logout")}>
-              Logout
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={logout}>Logout</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

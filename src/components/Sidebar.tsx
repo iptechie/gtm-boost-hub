@@ -126,20 +126,6 @@ const Sidebar: React.FC<SidebarProps> = ({ leads }) => {
           {/* Remove the Popover */}
         </div>
       )}
-
-      <div className="p-4 border-t border-sidebar-border">
-        <Link
-          to="/profile"
-          className={`sidebar-link ${isActive("/profile") ? "active" : ""}`}
-        >
-          <User size={20} />
-          <span>Profile</span>
-        </Link>
-        <Link to="/logout" className="sidebar-link">
-          <LogOut size={20} />
-          <span>Logout</span>
-        </Link>
-      </div>
     </div>
   );
 };

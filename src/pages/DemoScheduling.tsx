@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 const DemoScheduling = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -170,6 +171,12 @@ const DemoScheduling = () => {
                 }}
               />
             </Link>
+            <Badge
+              variant="outline"
+              className="ml-2 bg-purple-100 text-purple-800 border-purple-300 font-semibold"
+            >
+              BETA
+            </Badge>
           </div>
         </div>
 

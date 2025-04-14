@@ -1,4 +1,4 @@
-import React, { useMemo } from "react"; // Import useMemo
+import React, { useMemo, useEffect, useState } from "react"; // Import useMemo and useEffect
 import { useQuery } from "@tanstack/react-query";
 import {
   Users,
@@ -34,9 +34,15 @@ import StatsCard from "../components/StatsCard";
 import SubscriptionInfo from "../components/SubscriptionInfo";
 import { Button } from "@/components/ui/button";
 import { fetchLeads, fetchSubscriptionInfo } from "@/lib/api";
-import { Lead } from "@/components/LeadTable";
+import { Lead } from "@/types/lead";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format, parseISO, startOfMonth } from "date-fns"; // Removed unused getMonth, getYear
+import { format, parseISO, startOfMonth, subDays } from "date-fns"; // Removed unused getMonth, getYear
+import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import TimeRangeSelector, { TimeRange } from "@/components/TimeRangeSelector";
+import { supabase } from "@/lib/supabase";
 
 // Define colors for the pie chart
 const PIE_CHART_COLORS = [
@@ -50,7 +56,11 @@ const PIE_CHART_COLORS = [
   "#3F51B5",
 ];
 
-const Dashboard = () => {
+const Dashboard: React.FC = () => {
+  const { user } = useAuth();
+  const { currentPlan } = useSubscription();
+  const [timeRange, setTimeRange] = useState<TimeRange>("30");
+
   // Fetch Leads Data
   const {
     data: leadsData,
@@ -71,47 +81,49 @@ const Dashboard = () => {
     queryFn: fetchSubscriptionInfo,
   });
 
-  // Calculate dashboard metrics from leadsData
+  // Filter leads based on selected time range
+  const filteredLeads = useMemo(() => {
+    if (!leadsData) return [];
+
+    const now = new Date();
+    const daysAgo = subDays(now, parseInt(timeRange));
+
+    return leadsData.filter((lead) => {
+      const leadDate = new Date(lead.createdAt);
+      return leadDate >= daysAgo;
+    });
+  }, [leadsData, timeRange]);
+
+  // Calculate dashboard metrics from filtered leads
   const calculatedStats = useMemo(() => {
-    if (!leadsData) {
+    if (!filteredLeads.length) {
       return {
-        totalLeads: 1050,
-        meetingsBooked: 645,
-        dealsClosed: 245,
-        conversionRate: 23,
+        totalLeads: 0,
+        meetingsBooked: 0,
+        dealsClosed: 0,
+        conversionRate: 0,
       };
     }
-    const totalLeads = leadsData.length;
-    const meetingsBooked = leadsData.filter(
+
+    const totalLeads = filteredLeads.length;
+    const meetingsBooked = filteredLeads.filter(
       (lead) => lead.status.toLowerCase() === "discovery meeting"
     ).length;
-    const dealsClosed = leadsData.filter(
+    const dealsClosed = filteredLeads.filter(
       (lead) => lead.status.toLowerCase() === "won"
     ).length;
     const conversionRate =
       totalLeads > 0 ? Math.round((dealsClosed / totalLeads) * 100) : 0;
+
     return { totalLeads, meetingsBooked, dealsClosed, conversionRate };
-  }, [leadsData]);
+  }, [filteredLeads]);
 
   // Calculate Lead Generation Performance Data (Monthly)
   const leadGenPerformanceData = useMemo(() => {
-    if (!leadsData)
-      return [
-        { month: "Jan", leads: 120 },
-        { month: "Feb", leads: 145 },
-        { month: "Mar", leads: 168 },
-        { month: "Apr", leads: 192 },
-        { month: "May", leads: 215 },
-        { month: "Jun", leads: 238 },
-        { month: "Jul", leads: 265 },
-        { month: "Aug", leads: 288 },
-        { month: "Sep", leads: 312 },
-        { month: "Oct", leads: 335 },
-        { month: "Nov", leads: 358 },
-        { month: "Dec", leads: 385 },
-      ];
+    if (!filteredLeads.length) return [];
+
     const monthlyLeads: { [key: string]: number } = {};
-    leadsData.forEach((lead) => {
+    filteredLeads.forEach((lead) => {
       try {
         let contactDate: Date | null = null;
         try {
@@ -132,39 +144,36 @@ const Dashboard = () => {
         );
       }
     });
+
     const last12Months: string[] = [];
     const today = new Date();
     for (let i = 11; i >= 0; i--) {
       const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
       last12Months.push(format(date, "yyyy-MM"));
     }
+
     return last12Months.map((monthKey) => ({
       month: format(parseISO(monthKey + "-01"), "MMM yy"),
       leads: monthlyLeads[monthKey] || 0,
     }));
-  }, [leadsData]);
+  }, [filteredLeads]);
 
   // Calculate Lead Sources Data
   const leadSourcesData = useMemo(() => {
-    if (!leadsData)
-      return [
-        { name: "LinkedIn", value: 35, fill: "" },
-        { name: "Email Campaign", value: 25, fill: "" },
-        { name: "Website", value: 20, fill: "" },
-        { name: "Referrals", value: 15, fill: "" },
-        { name: "Events", value: 5, fill: "" },
-      ];
+    if (!filteredLeads.length) return [];
+
     const sourceCounts: { [key: string]: number } = {};
-    leadsData.forEach((lead) => {
-      const source = lead.category?.trim() || "Unknown";
+    filteredLeads.forEach((lead) => {
+      const source = lead.source?.trim() || "Unknown";
       sourceCounts[source] = (sourceCounts[source] || 0) + 1;
     });
+
     return Object.entries(sourceCounts).map(([name, value]) => ({
       name,
       value,
       fill: "",
     }));
-  }, [leadsData]);
+  }, [filteredLeads]);
 
   // Chart Configurations
   const leadGenChartConfig: ChartConfig = {
@@ -175,7 +184,7 @@ const Dashboard = () => {
   const leadSourcesChartConfig = useMemo(() => {
     const config: ChartConfig = {}; // Added type annotation
     const categories =
-      leadsData?.map((lead) => lead.category?.trim() || "Unknown") || [];
+      filteredLeads?.map((lead) => lead.source?.trim() || "Unknown") || [];
     const uniqueSources = [...new Set(categories)];
     uniqueSources.forEach((sourceName, index) => {
       config[sourceName] = {
@@ -184,27 +193,14 @@ const Dashboard = () => {
       };
     });
     return config;
-  }, [leadsData]);
+  }, [filteredLeads]);
 
   // Calculate Meetings Booked per Month Data
   const meetingsBookedMonthlyData = useMemo(() => {
-    if (!leadsData)
-      return [
-        { month: "Jan", meetings: 45 },
-        { month: "Feb", meetings: 52 },
-        { month: "Mar", meetings: 65 },
-        { month: "Apr", meetings: 78 },
-        { month: "May", meetings: 92 },
-        { month: "Jun", meetings: 105 },
-        { month: "Jul", meetings: 118 },
-        { month: "Aug", meetings: 132 },
-        { month: "Sep", meetings: 145 },
-        { month: "Oct", meetings: 158 },
-        { month: "Nov", meetings: 172 },
-        { month: "Dec", meetings: 185 },
-      ];
+    if (!filteredLeads.length) return [];
+
     const monthlyMeetings: { [key: string]: number } = {};
-    leadsData
+    filteredLeads
       .filter((lead) => lead.status.toLowerCase() === "discovery meeting")
       .forEach((lead) => {
         try {
@@ -227,17 +223,19 @@ const Dashboard = () => {
           );
         }
       });
+
     const last12Months: string[] = [];
     const today = new Date();
     for (let i = 11; i >= 0; i--) {
       const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
       last12Months.push(format(date, "yyyy-MM"));
     }
+
     return last12Months.map((monthKey) => ({
       month: format(parseISO(monthKey + "-01"), "MMM yy"),
       meetings: monthlyMeetings[monthKey] || 0,
     }));
-  }, [leadsData]);
+  }, [filteredLeads]);
 
   // Chart config for Meetings Booked
   const meetingsChartConfig: ChartConfig = {
@@ -246,7 +244,11 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+      </div>
       <div className="mb-10">
         <h1 className="text-3xl font-bold mb-2">Welcome back, John!</h1>
         <p className="text-slate-600">
@@ -280,7 +282,7 @@ const Dashboard = () => {
         </div>
       ) : errorLeads ? (
         <div className="text-red-500 mb-10">Error loading leads data.</div>
-      ) : leadsData ? (
+      ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <StatsCard
             title="Total Leads"
@@ -307,7 +309,7 @@ const Dashboard = () => {
             bgColor="bg-amber-50/50"
           />
         </div>
-      ) : null}
+      )}
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">

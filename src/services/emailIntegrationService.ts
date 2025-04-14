@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { Lead } from "@/types/lead";
 
 export interface EmailIntegration {
   id: string;
@@ -29,13 +30,14 @@ export interface EmailMessage {
   sentiment?: "positive" | "negative" | "neutral";
   intent?: "interested" | "not_interested" | "needs_more_info" | "unknown";
   leadId?: string;
+  score?: number;
 }
 
 export interface EmailAttachment {
   id: string;
   name: string;
   size: number;
-  contentType: string;
+  type: string;
   url: string;
 }
 
@@ -421,5 +423,122 @@ export const emailIntegrationService = {
       "I'd be happy to help you troubleshoot. Let's start by...",
       "I understand your concerns. Let me address them one by one...",
     ];
+  },
+
+  // Lead scoring based on email interactions
+  updateLeadScore: async (
+    leadId: string,
+    email: EmailMessage
+  ): Promise<void> => {
+    try {
+      // Get the current lead
+      const { data: lead, error: leadError } = await supabase
+        .from("leads")
+        .select("*")
+        .eq("id", leadId)
+        .single();
+
+      if (leadError) throw leadError;
+
+      // Calculate new score based on email interaction
+      let scoreChange = 0;
+
+      // Base score for receiving an email
+      scoreChange += 5;
+
+      // Additional points based on email characteristics
+      if (email.sentiment === "positive") scoreChange += 10;
+      if (email.intent === "interested") scoreChange += 15;
+      if (email.intent === "needs_more_info") scoreChange += 5;
+
+      // Update lead score
+      const newScore = Math.min(100, (lead.score || 0) + scoreChange);
+
+      // Update lead in database
+      const { error: updateError } = await supabase
+        .from("leads")
+        .update({
+          score: newScore,
+          lastContact: new Date().toISOString(),
+          interactions: (lead.interactions || 0) + 1,
+        })
+        .eq("id", leadId);
+
+      if (updateError) throw updateError;
+
+      // Log the interaction
+      await supabase.from("lead_activity_log").insert({
+        leadId,
+        type: "Email",
+        details: `Received email: ${email.subject}`,
+        scoreChange,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Error updating lead score:", error);
+      throw error;
+    }
+  },
+
+  // Email analysis with AI
+  analyzeEmail: async (
+    email: EmailMessage
+  ): Promise<{
+    sentiment: "positive" | "negative" | "neutral";
+    intent: "interested" | "not_interested" | "needs_more_info" | "unknown";
+    suggestedScore: number;
+  }> => {
+    try {
+      // In a real implementation, this would call an AI service
+      // For now, we'll use a simple rule-based system
+      const body = email.body.toLowerCase();
+
+      // Sentiment analysis
+      let sentiment: "positive" | "negative" | "neutral" = "neutral";
+      if (
+        body.includes("great") ||
+        body.includes("excellent") ||
+        body.includes("interested")
+      ) {
+        sentiment = "positive";
+      } else if (body.includes("not interested") || body.includes("decline")) {
+        sentiment = "negative";
+      }
+
+      // Intent detection
+      let intent:
+        | "interested"
+        | "not_interested"
+        | "needs_more_info"
+        | "unknown" = "unknown";
+      if (
+        body.includes("interested") ||
+        body.includes("would like to learn more")
+      ) {
+        intent = "interested";
+      } else if (body.includes("not interested") || body.includes("decline")) {
+        intent = "not_interested";
+      } else if (
+        body.includes("more information") ||
+        body.includes("tell me more")
+      ) {
+        intent = "needs_more_info";
+      }
+
+      // Score suggestion
+      let suggestedScore = 0;
+      if (sentiment === "positive") suggestedScore += 10;
+      if (intent === "interested") suggestedScore += 15;
+      if (intent === "needs_more_info") suggestedScore += 5;
+
+      return {
+        sentiment,
+        intent,
+        suggestedScore,
+      };
+    } catch (error) {
+      console.error("Error analyzing email:", error);
+      throw error;
+    }
   },
 };
