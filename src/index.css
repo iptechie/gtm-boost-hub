@@ -42,15 +42,34 @@
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 240 10% 13%;
     --sidebar-ring: 240 75% 64%;
+
+    /* Add font variables */
+    --font-sans: "Inter", system-ui, sans-serif;
+    --font-secondary: "Roboto", sans-serif;
   }
 
   * {
     @apply border-border;
   }
 
+  html {
+    font-family: var(--font-sans);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+  }
+
   body {
     @apply bg-gtm-light-gradient text-gtm-text min-h-screen bg-fixed;
     font-feature-settings: "ss01", "ss02", "cv01", "cv02", "cv03";
+    font-family: var(--font-sans);
   }
 
   .glass-card {
@@ -97,6 +116,10 @@
 
   .progress-value {
     @apply h-full bg-gtm-gradient rounded-full;
+  }
+
+  .font-roboto {
+    font-family: var(--font-secondary);
   }
 
   /* Custom override for react-day-picker today highlight when range is selected */
