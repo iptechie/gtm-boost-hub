@@ -179,15 +179,15 @@ const DemoScheduling = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8 select-none">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 py-6 sm:py-8 md:py-12 px-4 sm:px-6 lg:px-8 select-none">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center fixed top-0 left-0 right-0 z-50 px-4 h-20">
+        <div className="flex justify-between items-center fixed top-0 left-0 right-0 z-50 px-4 h-16 sm:h-20 bg-white/80 backdrop-blur-md shadow-sm">
           <div className="flex items-center select-none">
             <Link to="/" className="inline-block select-none">
               <img
                 src="/site-logo.png"
                 alt="GTMCentric"
-                className="h-24 w-auto object-contain select-none cursor-pointer"
+                className="h-16 sm:h-20 md:h-24 w-auto object-contain select-none cursor-pointer"
                 onClick={(e) => {
                   if (window.location.pathname === "/") {
                     e.preventDefault();
@@ -199,34 +199,36 @@ const DemoScheduling = () => {
             </Link>
             <Badge
               variant="outline"
-              className="ml-2 -mt-10 bg-purple-100 text-purple-800 border-purple-300 font-semibold"
+              className="ml-2 -mt-6 sm:-mt-8 md:-mt-10 bg-purple-100 text-purple-800 border-purple-300 font-semibold"
             >
               BETA
             </Badge>
           </div>
         </div>
 
-        <div className="text-center mb-12 mt-20">
-          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
+        <div className="text-center mb-8 sm:mb-10 md:mb-12 mt-16 sm:mt-18 md:mt-20">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
             Schedule a Demo
           </h1>
-          <p className="mt-3 text-lg text-gray-600 max-w-2xl mx-auto">
+          <p className="mt-2 sm:mt-3 text-base sm:text-lg text-gray-600 max-w-2xl mx-auto">
             See how GTMCentric can transform your go-to-market strategy. Select
             a date and time that works for you.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
           {/* Calendar and Time Selection */}
           <div className="lg:col-span-2">
             <Card className="h-full">
-              <CardHeader>
-                <CardTitle>Select Date & Time</CardTitle>
+              <CardHeader className="sm:pb-2 md:pb-4">
+                <CardTitle className="text-xl sm:text-2xl">
+                  Select Date & Time
+                </CardTitle>
                 <CardDescription>
                   Choose when you'd like to have your demo
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 sm:space-y-6">
                 <div className="space-y-2">
                   <Label>Date</Label>
                   <Popover>
@@ -295,11 +297,11 @@ const DemoScheduling = () => {
                   </Select>
                 </div>
 
-                <div className="p-4 bg-indigo-50 rounded-lg font-roboto">
-                  <h3 className="font-medium text-indigo-800 mb-2">
+                <div className="p-3 sm:p-4 bg-indigo-50 rounded-lg font-roboto">
+                  <h3 className="text-sm sm:text-base font-medium text-indigo-800 mb-2">
                     What to expect:
                   </h3>
-                  <ul className="space-y-2 text-sm text-indigo-700">
+                  <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-indigo-700">
                     <li className="flex items-start">
                       <span className="mr-2">•</span>
                       <span>30-minute personalized demo of GTMCentric</span>
@@ -321,15 +323,20 @@ const DemoScheduling = () => {
           {/* Contact Form */}
           <div>
             <Card className="h-full">
-              <CardHeader>
-                <CardTitle>Your Information</CardTitle>
+              <CardHeader className="sm:pb-2 md:pb-4">
+                <CardTitle className="text-xl sm:text-2xl">
+                  Your Information
+                </CardTitle>
                 <CardDescription>
                   Fill in your details to confirm the demo
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
+                <form
+                  onSubmit={handleSubmit}
+                  className="space-y-3 sm:space-y-4"
+                >
+                  <div className="space-y-1 sm:space-y-2">
                     <Label htmlFor="name">Name</Label>
                     <div className="relative">
                       <Users className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -345,7 +352,7 @@ const DemoScheduling = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-1 sm:space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -362,7 +369,7 @@ const DemoScheduling = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-1 sm:space-y-2">
                     <Label htmlFor="company">Company</Label>
                     <div className="relative">
                       <Building className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -378,7 +385,7 @@ const DemoScheduling = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-1 sm:space-y-2">
                     <Label htmlFor="phone">Phone</Label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -394,7 +401,7 @@ const DemoScheduling = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-1 sm:space-y-2">
                     <Label htmlFor="attendees">Number of Attendees</Label>
                     <Select
                       value={formData.attendees}
@@ -414,7 +421,7 @@ const DemoScheduling = () => {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-1 sm:space-y-2">
                     <Label htmlFor="message">Additional Information</Label>
                     <div className="relative">
                       <MessageSquare className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -422,7 +429,7 @@ const DemoScheduling = () => {
                         id="message"
                         name="message"
                         placeholder="Any specific questions or requirements?"
-                        className="pl-10 min-h-[100px]"
+                        className="pl-10 min-h-[80px] sm:min-h-[100px]"
                         value={formData.message}
                         onChange={handleInputChange}
                       />
@@ -431,7 +438,7 @@ const DemoScheduling = () => {
 
                   <Button
                     type="submit"
-                    className="w-full bg-indigo-600 hover:bg-indigo-700"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 mt-2 sm:mt-4"
                     disabled={!isFormValid() || isSubmitting}
                   >
                     {isSubmitting ? "Scheduling..." : "Schedule Demo"}

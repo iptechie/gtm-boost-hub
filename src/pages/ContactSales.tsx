@@ -90,43 +90,43 @@ const ContactSales: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-radial from-blue-100 via-indigo-100 to-purple-100 text-slate-800 select-none">
       {/* Navigation */}
-      <div className="flex justify-between items-center fixed top-0 left-0 right-0 z-50 px-4 h-20">
+      <div className="flex justify-between items-center fixed top-0 left-0 right-0 z-50 px-4 h-16 sm:h-20 bg-white/80 backdrop-blur-md shadow-sm">
         <div className="flex items-center select-none">
           <Link to="/" className="inline-block select-none">
             <img
               src="/site-logo.png"
               alt="GTMCentric"
-              className="h-24 w-auto object-contain select-none"
+              className="h-16 sm:h-20 md:h-24 w-auto object-contain select-none cursor-pointer"
             />
           </Link>
           <Badge
             variant="outline"
-            className="ml-2 -mt-10 bg-purple-100 text-purple-800 border-purple-300 font-semibold"
+            className="ml-2 -mt-6 sm:-mt-8 md:-mt-10 bg-purple-100 text-purple-800 border-purple-300 font-semibold"
           >
             BETA
           </Badge>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 pt-32 pb-8">
+      <div className="container mx-auto px-4 pt-24 sm:pt-28 md:pt-32 pb-6 sm:pb-8">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-6">
-            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
+          <div className="text-center mb-4 sm:mb-6">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
               Talk to Our Sales Team
             </h1>
-            <p className="text-lg text-slate-700 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg text-slate-700 max-w-2xl mx-auto">
               Get personalized guidance on how GTMCentric can accelerate your
               go-to-market strategy
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:grid-rows-1 lg:auto-rows-fr">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 lg:grid-rows-1 lg:auto-rows-fr">
             {/* Left side - Team and Why Work With Us cards */}
-            <div className="space-y-8 flex flex-col justify-between h-full">
+            <div className="space-y-4 sm:space-y-6 md:space-y-8 flex flex-col justify-between h-full">
               {/* Meet Our Team Card */}
               <div className="bg-indigo-500 rounded-xl overflow-hidden relative group cursor-pointer flex-1 flex flex-col">
                 {/* Team Photo with Overlay */}
-                <div className="w-full flex-1 relative min-h-[240px]">
+                <div className="w-full flex-1 relative min-h-[200px] sm:min-h-[240px]">
                   <img
                     src="/images/team-photo.jpg"
                     alt="Team"
@@ -137,11 +137,11 @@ const ContactSales: React.FC = () => {
                 </div>
 
                 {/* Content */}
-                <div className="p-6 relative z-10 text-center">
-                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white/30 backdrop-blur-sm mx-auto -mt-10 shadow-lg border-2 border-white/30 transition-all duration-300 group-hover:bg-indigo-500/60 group-hover:border-white/50">
+                <div className="p-4 sm:p-6 relative z-10 text-center">
+                  <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-white/30 backdrop-blur-sm mx-auto -mt-8 sm:-mt-10 shadow-lg border-2 border-white/30 transition-all duration-300 group-hover:bg-indigo-500/60 group-hover:border-white/50">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-8 w-8 text-white"
+                      className="h-6 w-6 sm:h-8 sm:w-8 text-white"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -155,28 +155,28 @@ const ContactSales: React.FC = () => {
                       <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold mt-3 mb-2 text-white drop-shadow-md">
+                  <h3 className="text-lg sm:text-xl font-bold mt-2 sm:mt-3 mb-1 sm:mb-2 text-white drop-shadow-md">
                     Meet Our Team
                   </h3>
-                  <p className="text-sm mb-0 text-white drop-shadow-md">
+                  <p className="text-xs sm:text-sm mb-0 text-white drop-shadow-md">
                     Dedicated experts ready to help you succeed
                   </p>
                 </div>
               </div>
 
               {/* Why Work With Us Card */}
-              <div className="bg-gradient-to-br from-slate-50 to-indigo-50 rounded-xl p-8 text-slate-800 flex-1 flex flex-col justify-between shadow-md border border-white/20">
+              <div className="bg-gradient-to-br from-slate-50 to-indigo-50 rounded-xl p-4 sm:p-6 md:p-8 text-slate-800 flex-1 flex flex-col justify-between shadow-md border border-white/20">
                 <div>
-                  <h3 className="text-xl font-bold mb-6 text-indigo-700">
+                  <h3 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-indigo-700">
                     Why Work With Us
                   </h3>
 
                   {/* Enterprise-Ready Solutions */}
-                  <div className="flex items-center mb-6">
-                    <div className="bg-indigo-100 p-3 rounded-full mr-4 shadow-sm">
+                  <div className="flex items-center mb-4 sm:mb-6">
+                    <div className="bg-indigo-100 p-2 sm:p-3 rounded-full mr-3 sm:mr-4 shadow-sm">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 text-indigo-600"
+                        className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -191,21 +191,21 @@ const ContactSales: React.FC = () => {
                       </svg>
                     </div>
                     <div>
-                      <h4 className="font-medium text-indigo-900">
+                      <h4 className="text-sm sm:text-base font-medium text-indigo-900">
                         Enterprise-Ready Solutions
                       </h4>
-                      <p className="text-sm text-slate-600">
+                      <p className="text-xs sm:text-sm text-slate-600">
                         Scalable platform built for businesses of all sizes
                       </p>
                     </div>
                   </div>
 
                   {/* Global Support */}
-                  <div className="flex items-center mb-6">
-                    <div className="bg-indigo-100 p-3 rounded-full mr-4 shadow-sm">
+                  <div className="flex items-center mb-4 sm:mb-6">
+                    <div className="bg-indigo-100 p-2 sm:p-3 rounded-full mr-3 sm:mr-4 shadow-sm">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 text-indigo-600"
+                        className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -219,10 +219,10 @@ const ContactSales: React.FC = () => {
                       </svg>
                     </div>
                     <div>
-                      <h4 className="font-medium text-indigo-900">
+                      <h4 className="text-sm sm:text-base font-medium text-indigo-900">
                         Global Support
                       </h4>
-                      <p className="text-sm text-slate-600">
+                      <p className="text-xs sm:text-sm text-slate-600">
                         24/7 assistance across multiple regions and time zones
                       </p>
                     </div>
@@ -230,10 +230,10 @@ const ContactSales: React.FC = () => {
 
                   {/* Dedicated Account Manager */}
                   <div className="flex items-center">
-                    <div className="bg-indigo-100 p-3 rounded-full mr-4 shadow-sm">
+                    <div className="bg-indigo-100 p-2 sm:p-3 rounded-full mr-3 sm:mr-4 shadow-sm">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 text-indigo-600"
+                        className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -248,254 +248,298 @@ const ContactSales: React.FC = () => {
                       </svg>
                     </div>
                     <div>
-                      <h4 className="font-medium text-indigo-900">
+                      <h4 className="text-sm sm:text-base font-medium text-indigo-900">
                         Dedicated Account Manager
                       </h4>
-                      <p className="text-sm text-slate-600">
-                        Personal support throughout your GTMCentric journey
+                      <p className="text-xs sm:text-sm text-slate-600">
+                        Personalized support throughout your GTMCentric journey
                       </p>
                     </div>
-                  </div>
-                </div>
-
-                {/* Add a decorative element to fill the bottom space */}
-                <div className="mt-6 pt-4 border-t border-indigo-100">
-                  <div className="flex items-center justify-center">
-                    <span className="text-xs text-indigo-400 font-medium">
-                      Trusted by businesses worldwide
-                    </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Right side - Contact form */}
-            <div className="bg-gradient-to-br from-slate-50 to-indigo-50 rounded-xl p-8 col-span-1 lg:col-span-2 text-slate-800 flex flex-col h-full shadow-md border border-white/20">
-              <h2 className="text-2xl font-semibold mb-6 text-indigo-700">
-                Contact Our Sales Team
-              </h2>
+            {/* Right side - Contact Form */}
+            <div className="lg:col-span-2">
+              <div className="bg-white bg-opacity-80 backdrop-blur-lg rounded-xl shadow-lg p-4 sm:p-6 md:p-8 border border-white/50">
+                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-slate-800">
+                  Contact Our Sales Team
+                </h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Full Name */}
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label
+                        htmlFor="fullName"
+                        className="text-sm sm:text-base text-slate-700"
+                      >
+                        Full Name
+                      </Label>
+                      <Input
+                        id="fullName"
+                        name="fullName"
+                        placeholder="Your name"
+                        value={formData.fullName}
+                        onChange={handleInputChange}
+                        required
+                        className="bg-white/80 border-slate-300"
+                      />
+                    </div>
+                    {/* Work Email */}
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label
+                        htmlFor="workEmail"
+                        className="text-sm sm:text-base text-slate-700"
+                      >
+                        Work Email
+                      </Label>
+                      <Input
+                        id="workEmail"
+                        name="workEmail"
+                        type="email"
+                        placeholder="you@company.com"
+                        value={formData.workEmail}
+                        onChange={handleInputChange}
+                        required
+                        className="bg-white/80 border-slate-300"
+                      />
+                    </div>
+                  </div>
 
-              <h3 className="font-medium mb-4 text-indigo-600">
-                Personal Information
-              </h3>
-              <form
-                onSubmit={handleSubmit}
-                className="space-y-6 flex-grow flex flex-col"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName" className="text-indigo-800">
-                      Full Name
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Job Title */}
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label
+                        htmlFor="jobTitle"
+                        className="text-sm sm:text-base text-slate-700"
+                      >
+                        Job Title
+                      </Label>
+                      <Input
+                        id="jobTitle"
+                        name="jobTitle"
+                        placeholder="Your role"
+                        value={formData.jobTitle}
+                        onChange={handleInputChange}
+                        required
+                        className="bg-white/80 border-slate-300"
+                      />
+                    </div>
+                    {/* Phone Number */}
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label
+                        htmlFor="phoneNumber"
+                        className="text-sm sm:text-base text-slate-700"
+                      >
+                        Phone Number
+                      </Label>
+                      <Input
+                        id="phoneNumber"
+                        name="phoneNumber"
+                        type="tel"
+                        placeholder="Your phone number"
+                        value={formData.phoneNumber}
+                        onChange={handleInputChange}
+                        className="bg-white/80 border-slate-300"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Company Name */}
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label
+                        htmlFor="companyName"
+                        className="text-sm sm:text-base text-slate-700"
+                      >
+                        Company Name
+                      </Label>
+                      <Input
+                        id="companyName"
+                        name="companyName"
+                        placeholder="Your company"
+                        value={formData.companyName}
+                        onChange={handleInputChange}
+                        required
+                        className="bg-white/80 border-slate-300"
+                      />
+                    </div>
+                    {/* Company Size */}
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label
+                        htmlFor="companySize"
+                        className="text-sm sm:text-base text-slate-700"
+                      >
+                        Company Size
+                      </Label>
+                      <Select
+                        value={formData.companySize}
+                        onValueChange={(value) =>
+                          handleSelectChange("companySize", value)
+                        }
+                      >
+                        <SelectTrigger
+                          id="companySize"
+                          className="bg-white/80 border-slate-300"
+                        >
+                          <SelectValue placeholder="Select company size" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1-10">1-10 employees</SelectItem>
+                          <SelectItem value="11-50">11-50 employees</SelectItem>
+                          <SelectItem value="51-200">
+                            51-200 employees
+                          </SelectItem>
+                          <SelectItem value="201-500">
+                            201-500 employees
+                          </SelectItem>
+                          <SelectItem value="501-1000">
+                            501-1000 employees
+                          </SelectItem>
+                          <SelectItem value="1001+">1001+ employees</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Industry */}
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label
+                        htmlFor="industry"
+                        className="text-sm sm:text-base text-slate-700"
+                      >
+                        Industry
+                      </Label>
+                      <Select
+                        value={formData.industry}
+                        onValueChange={(value) =>
+                          handleSelectChange("industry", value)
+                        }
+                      >
+                        <SelectTrigger
+                          id="industry"
+                          className="bg-white/80 border-slate-300"
+                        >
+                          <SelectValue placeholder="Select industry" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="technology">Technology</SelectItem>
+                          <SelectItem value="finance">Finance</SelectItem>
+                          <SelectItem value="healthcare">Healthcare</SelectItem>
+                          <SelectItem value="education">Education</SelectItem>
+                          <SelectItem value="retail">Retail</SelectItem>
+                          <SelectItem value="manufacturing">
+                            Manufacturing
+                          </SelectItem>
+                          <SelectItem value="professional_services">
+                            Professional Services
+                          </SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Region */}
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label
+                        htmlFor="region"
+                        className="text-sm sm:text-base text-slate-700"
+                      >
+                        Region
+                      </Label>
+                      <Select
+                        value={formData.region}
+                        onValueChange={(value) =>
+                          handleSelectChange("region", value)
+                        }
+                      >
+                        <SelectTrigger
+                          id="region"
+                          className="bg-white/80 border-slate-300"
+                        >
+                          <SelectValue placeholder="Select region" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="north_america">
+                            North America
+                          </SelectItem>
+                          <SelectItem value="south_america">
+                            South America
+                          </SelectItem>
+                          <SelectItem value="europe">Europe</SelectItem>
+                          <SelectItem value="asia_pacific">
+                            Asia Pacific
+                          </SelectItem>
+                          <SelectItem value="middle_east">
+                            Middle East & Africa
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Message */}
+                  <div className="space-y-1 sm:space-y-2">
+                    <Label
+                      htmlFor="message"
+                      className="text-sm sm:text-base text-slate-700"
+                    >
+                      How can we help?
                     </Label>
-                    <Input
-                      id="fullName"
-                      name="fullName"
-                      value={formData.fullName}
+                    <Textarea
+                      id="message"
+                      name="message"
+                      placeholder="Tell us about your specific needs and questions"
+                      value={formData.message}
                       onChange={handleInputChange}
+                      className="h-24 sm:h-32 bg-white/80 border-slate-300"
                       required
-                      placeholder="Your Name"
-                      className="border-indigo-100 focus-visible:ring-indigo-500"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="workEmail" className="text-indigo-800">
-                      Work Email
-                    </Label>
-                    <Input
-                      id="workEmail"
-                      name="workEmail"
-                      type="email"
-                      value={formData.workEmail}
-                      onChange={handleInputChange}
+
+                  {/* Terms Checkbox */}
+                  <div className="flex items-start space-x-2">
+                    <Checkbox
+                      id="acceptTerms"
+                      checked={formData.acceptTerms}
+                      onCheckedChange={handleCheckboxChange}
+                      className="mt-1"
                       required
-                      placeholder="you@company.com"
-                      className="border-indigo-100 focus-visible:ring-indigo-500"
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phoneNumber" className="text-indigo-800">
-                      Phone Number
+                    <Label
+                      htmlFor="acceptTerms"
+                      className="text-xs sm:text-sm text-slate-600 font-normal"
+                    >
+                      I agree to GTMCentric's{" "}
+                      <a
+                        href="#"
+                        className="text-indigo-600 hover:text-indigo-800 underline"
+                      >
+                        Terms of Service
+                      </a>{" "}
+                      and{" "}
+                      <a
+                        href="#"
+                        className="text-indigo-600 hover:text-indigo-800 underline"
+                      >
+                        Privacy Policy
+                      </a>
+                      . GTMCentric will process your data to provide you with
+                      information about our products and services.
                     </Label>
-                    <Input
-                      id="phoneNumber"
-                      name="phoneNumber"
-                      value={formData.phoneNumber}
-                      onChange={handleInputChange}
-                      placeholder="+1 (555) 123-4567"
-                      className="border-indigo-100 focus-visible:ring-indigo-500"
-                    />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="jobTitle" className="text-indigo-800">
-                      Job Title
-                    </Label>
-                    <Input
-                      id="jobTitle"
-                      name="jobTitle"
-                      value={formData.jobTitle}
-                      onChange={handleInputChange}
-                      placeholder="Your Position"
-                      className="border-indigo-100 focus-visible:ring-indigo-500"
-                    />
-                  </div>
-                </div>
 
-                <h3 className="font-medium mb-4 mt-6 text-indigo-600">
-                  Company Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName" className="text-indigo-800">
-                      Company Name
-                    </Label>
-                    <Input
-                      id="companyName"
-                      name="companyName"
-                      value={formData.companyName}
-                      onChange={handleInputChange}
-                      required
-                      placeholder="Company Name"
-                      className="border-indigo-100 focus-visible:ring-indigo-500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="companySize" className="text-indigo-800">
-                      Company Size
-                    </Label>
-                    <Select
-                      value={formData.companySize}
-                      onValueChange={(value) =>
-                        handleSelectChange("companySize", value)
-                      }
-                    >
-                      <SelectTrigger className="border-indigo-100 focus-visible:ring-indigo-500">
-                        <SelectValue placeholder="Select company size" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1-10">1-10 employees</SelectItem>
-                        <SelectItem value="11-50">11-50 employees</SelectItem>
-                        <SelectItem value="51-200">51-200 employees</SelectItem>
-                        <SelectItem value="201-500">
-                          201-500 employees
-                        </SelectItem>
-                        <SelectItem value="501-1000">
-                          501-1000 employees
-                        </SelectItem>
-                        <SelectItem value="1000+">1000+ employees</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="industry" className="text-indigo-800">
-                      Industry
-                    </Label>
-                    <Select
-                      value={formData.industry}
-                      onValueChange={(value) =>
-                        handleSelectChange("industry", value)
-                      }
-                    >
-                      <SelectTrigger className="border-indigo-100 focus-visible:ring-indigo-500">
-                        <SelectValue placeholder="Select industry" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="technology">Technology</SelectItem>
-                        <SelectItem value="finance">Finance</SelectItem>
-                        <SelectItem value="healthcare">Healthcare</SelectItem>
-                        <SelectItem value="education">Education</SelectItem>
-                        <SelectItem value="manufacturing">
-                          Manufacturing
-                        </SelectItem>
-                        <SelectItem value="retail">Retail</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="region" className="text-indigo-800">
-                      Region
-                    </Label>
-                    <Select
-                      value={formData.region}
-                      onValueChange={(value) =>
-                        handleSelectChange("region", value)
-                      }
-                    >
-                      <SelectTrigger className="border-indigo-100 focus-visible:ring-indigo-500">
-                        <SelectValue placeholder="Select region" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="north-america">
-                          North America
-                        </SelectItem>
-                        <SelectItem value="south-america">
-                          South America
-                        </SelectItem>
-                        <SelectItem value="europe">Europe</SelectItem>
-                        <SelectItem value="asia-pacific">
-                          Asia Pacific
-                        </SelectItem>
-                        <SelectItem value="middle-east">Middle East</SelectItem>
-                        <SelectItem value="africa">Africa</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="message" className="text-indigo-800">
-                    How can we help?
-                  </Label>
-                  <Textarea
-                    id="message"
-                    name="message"
-                    value={formData.message}
-                    onChange={handleInputChange}
-                    placeholder="Tell us about your specific needs and requirements..."
-                    className="border-indigo-100 focus-visible:ring-indigo-500 min-h-[120px]"
-                  />
-                </div>
-
-                <div className="flex items-start space-x-2">
-                  <Checkbox
-                    id="acceptTerms"
-                    checked={formData.acceptTerms}
-                    onCheckedChange={handleCheckboxChange}
-                    className="mt-1 border-indigo-200 data-[state=checked]:bg-indigo-600"
-                  />
-                  <Label
-                    htmlFor="acceptTerms"
-                    className="text-sm font-normal text-slate-700"
-                  >
-                    I agree to the terms and conditions
-                    <br />
-                    By submitting this form, you agree to our{" "}
-                    <Link
-                      to="/privacy"
-                      className="text-indigo-600 hover:underline"
-                    >
-                      Privacy Policy
-                    </Link>{" "}
-                    and{" "}
-                    <Link
-                      to="/terms"
-                      className="text-indigo-600 hover:underline"
-                    >
-                      Terms of Service
-                    </Link>
-                  </Label>
-                </div>
-
-                <div className="mt-auto pt-4">
+                  {/* Submit Button */}
                   <Button
                     type="submit"
                     disabled={isSubmitting || !formData.acceptTerms}
-                    className="w-full bg-gradient-to-r from-purple-500 via-indigo-500 to-indigo-600 hover:from-purple-600 hover:via-indigo-600 hover:to-indigo-700 text-white font-medium py-3 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-300 rounded-lg"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-5 mt-2 sm:mt-4"
                   >
                     {isSubmitting ? "Sending..." : "Get in Touch"}
                   </Button>
-                </div>
-              </form>
+                </form>
+              </div>
             </div>
           </div>
         </div>
