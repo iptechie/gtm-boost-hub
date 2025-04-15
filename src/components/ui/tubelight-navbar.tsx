@@ -27,6 +27,13 @@ export function NavBar({ items, className }: NavBarProps) {
       setIsMobile(window.innerWidth < 768);
     };
 
+    // Add a scroll event listener to clear the active tab when scrolling to the top
+    const handleScroll = () => {
+      if (window.scrollY < 100) {
+        setActiveTab(null);
+      }
+    };
+
     // Check current hash or pathname to set initial active tab
     const { hash, pathname } = window.location;
     if (hash) {
@@ -44,9 +51,11 @@ export function NavBar({ items, className }: NavBarProps) {
 
     handleResize();
     window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", handleScroll);
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleScroll);
     };
   }, [items]);
 
