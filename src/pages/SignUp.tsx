@@ -22,6 +22,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signUpWithEmail, signInWithProvider } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
+import Logo from "@/components/Logo";
 
 // Password strength indicator component
 const PasswordStrengthIndicator = ({ password }: { password: string }) => {
@@ -162,7 +163,10 @@ const SignUp: React.FC = () => {
 
   if (showVerificationMessage) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <Logo />
+        </div>
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-center">
