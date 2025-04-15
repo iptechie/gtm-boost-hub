@@ -116,7 +116,7 @@ const navItems = [
   { name: "Features", url: "#features", icon: Home },
   { name: "Pricing", url: "#pricing", icon: DollarSign },
   { name: "Demo", url: "/demo-scheduling", icon: PlayCircle },
-  { name: "Contact", url: "#contact", icon: PhoneCall },
+  { name: "Contact", url: "/contact-sales", icon: PhoneCall },
 ];
 
 const LandingPage = () => {
@@ -155,7 +155,7 @@ const LandingPage = () => {
           </Link>
           <Badge
             variant="outline"
-            className="ml-2 bg-purple-100 text-purple-800 border-purple-300 font-semibold"
+            className="ml-2 -mt-10 bg-purple-100 text-purple-800 border-purple-300 font-semibold"
           >
             BETA
           </Badge>
@@ -583,12 +583,6 @@ const LandingPage = () => {
                   {tier.popular && (
                     <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.1),rgba(255,255,255,0))] pointer-events-none" />
                   )}
-                  {tier.id === "starter" && (
-                    <div className="absolute -right-12 top-5 rotate-45 bg-emerald-500 text-white py-1 px-12 text-sm font-bold shadow-md z-10 pointer-events-none">
-                      FREE
-                    </div>
-                  )}
-
                   <h3 className="flex items-center gap-3 text-xl font-medium">
                     {tier.name}
                     {tier.popular && (
@@ -607,7 +601,9 @@ const LandingPage = () => {
                         ? `$${tier.price[selectedFrequency]}`
                         : tier.price[selectedFrequency]}
                     </div>
-                    {tier.id !== "starter" && tier.id !== "enterprise" && (
+                    {(tier.id === "basic" ||
+                      tier.id === "pro" ||
+                      tier.id === "enterprise") && (
                       <Badge
                         variant="outline"
                         className={`absolute -right-1 -top-1 ${

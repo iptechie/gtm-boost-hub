@@ -15,6 +15,7 @@ import {
 import { ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { submitContactSalesForm } from "@/lib/supabase";
 
 const ContactSales: React.FC = () => {
   const navigate = useNavigate();
@@ -56,14 +57,34 @@ const ContactSales: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Submit the form data to Supabase
+      const { error } = await submitContactSalesForm({
+        fullName: formData.fullName,
+        workEmail: formData.workEmail,
+        phoneNumber: formData.phoneNumber,
+        jobTitle: formData.jobTitle,
+        companyName: formData.companyName,
+        companySize: formData.companySize,
+        industry: formData.industry,
+        region: formData.region,
+        message: formData.message,
+      });
+
+      if (error) {
+        throw error;
+      }
+
       toast.success(
         "Your message has been sent! Our sales team will contact you soon."
       );
-      setIsSubmitting(false);
       navigate("/");
-    }, 1500);
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -80,7 +101,7 @@ const ContactSales: React.FC = () => {
           </Link>
           <Badge
             variant="outline"
-            className="ml-2 bg-purple-100 text-purple-800 border-purple-300 font-semibold"
+            className="ml-2 -mt-10 bg-purple-100 text-purple-800 border-purple-300 font-semibold"
           >
             BETA
           </Badge>

@@ -80,7 +80,7 @@ const Login: React.FC = () => {
               </Link>
               <Badge
                 variant="outline"
-                className="ml-2 bg-purple-100 text-purple-800 border-purple-300 font-semibold"
+                className="ml-2 -mt-10 bg-purple-100 text-purple-800 border-purple-300 font-semibold"
               >
                 BETA
               </Badge>
@@ -188,24 +188,6 @@ const Login: React.FC = () => {
                   />
                 </svg>
                 {isLoading ? "Signing in..." : "Continue with Google"}
-              </Button>
-
-              <Button
-                variant="outline"
-                onClick={() => handleProviderSignIn("azure")}
-                disabled={isLoading}
-                className="flex items-center justify-center w-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900 transition-all"
-              >
-                <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                  <path
-                    d="M11.4 24H0l11.4-11.4L0 0h11.4l11.4 11.4L11.4 24z"
-                    fill="#F25022"
-                  />
-                  <path d="M24 24H12.6L24 12.6V24z" fill="#00A4EF" />
-                  <path d="M24 11.4H12.6L24 0v11.4z" fill="#7FBA00" />
-                  <path d="M11.4 11.4H0L11.4 0v11.4z" fill="#FFB900" />
-                </svg>
-                {isLoading ? "Signing in..." : "Continue with Microsoft"}
               </Button>
             </div>
           </CardContent>

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
 interface NavItem {
   name: string;
@@ -19,29 +20,33 @@ interface NavBarProps {
 export function NavBar({ items, className }: NavBarProps) {
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
     };
 
-    // Add a scroll event listener to clear the active tab when scrolling to the top
-    const handleScroll = () => {
-      if (window.scrollY < 100) {
-        setActiveTab(null);
+    // Check current hash or pathname to set initial active tab
+    const { hash, pathname } = window.location;
+    if (hash) {
+      const matchingItem = items.find((item) => item.url === hash);
+      if (matchingItem) {
+        setActiveTab(matchingItem.name);
       }
-    };
+    } else {
+      // For direct navigation to URLs like /demo-scheduling
+      const matchingItem = items.find((item) => item.url === pathname);
+      if (matchingItem) {
+        setActiveTab(matchingItem.name);
+      }
+    }
 
     handleResize();
     window.addEventListener("resize", handleResize);
-    window.addEventListener("scroll", handleScroll);
-
-    // Clear active tab on initial load
-    setActiveTab(null);
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      window.removeEventListener("scroll", handleScroll);
     };
   }, [items]);
 
@@ -73,8 +78,8 @@ export function NavBar({ items, className }: NavBarProps) {
         console.error(`Element with id "${targetId}" not found`);
       }
     } else {
-      // Navigate to a different page
-      window.location.href = item.url;
+      // Navigate to a different page using react-router
+      navigate(item.url);
     }
   };
 

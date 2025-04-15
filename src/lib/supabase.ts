@@ -65,6 +65,10 @@ export const signInWithProvider = async (provider: Provider) => {
       return { data: null, error };
     }
 
+    // Note: For OAuth providers, we need to handle user workspace initialization
+    // in a session callback since the user isn't immediately available
+    // See handleAuthChange function below
+
     return { data, error };
   } catch (error) {
     console.error(`Unexpected error during ${provider} sign in:`, error);
@@ -72,21 +76,148 @@ export const signInWithProvider = async (provider: Provider) => {
   }
 };
 
+// New function to handle OAuth callback and initialize workspace if needed
+export const handleOAuthCallback = async () => {
+  try {
+    // Exchange the auth code for a session
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) throw error;
+
+    if (data.session) {
+      // Check if the user was just created (is new)
+      const { user } = data.session;
+
+      // Check if this user already has a workspace
+      const { data: existingWorkspace } = await supabase
+        .from("workspaces")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      // Only initialize for new users with no workspace
+      if (!existingWorkspace) {
+        // Get user details from auth metadata
+        const userData: UserData = {
+          id: user.id,
+          email: user.email || "",
+          full_name:
+            user.user_metadata.full_name ||
+            user.user_metadata.name ||
+            user.email?.split("@")[0] ||
+            "User",
+          organization_id: undefined,
+        };
+
+        // Initialize user dataspace
+        await initializeUserDataspace(userData);
+        console.log("User workspace initialized for OAuth user:", user.id);
+      }
+    }
+
+    return { data, error: null };
+  } catch (error) {
+    console.error("Error handling OAuth callback:", error);
+    return { data: null, error };
+  }
+};
+
+// Function to check session and initialize workspace if needed for existing auth session
+export const checkAndInitializeUserWorkspace = async () => {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) throw error;
+
+    if (data.session?.user) {
+      const user = data.session.user;
+
+      // Check if this user already has a workspace
+      const { data: existingWorkspace } = await supabase
+        .from("workspaces")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      // Only initialize if no workspace exists
+      if (!existingWorkspace) {
+        // Get user details from auth metadata
+        const userData: UserData = {
+          id: user.id,
+          email: user.email || "",
+          full_name:
+            user.user_metadata.full_name ||
+            user.user_metadata.name ||
+            user.email?.split("@")[0] ||
+            "User",
+          organization_id: undefined,
+        };
+
+        // Initialize user dataspace
+        await initializeUserDataspace(userData);
+        console.log("User workspace initialized for existing user:", user.id);
+      }
+    }
+
+    return { session: data.session, error: null };
+  } catch (error) {
+    console.error("Error checking and initializing user workspace:", error);
+    return { session: null, error };
+  }
+};
+
 export const signUpWithEmail = async (
   email: string,
   password: string,
-  userType: "single" | "company"
+  userType: "single" | "company",
+  userData?: {
+    name?: string;
+    organizationName?: string;
+  }
 ) => {
+  // Sign up with Supabase Auth
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
         user_type: userType,
+        full_name: userData?.name,
+        organization_name: userData?.organizationName,
       },
       emailRedirectTo: getOAuthRedirectUrl(),
     },
   });
+
+  // If signup is successful and we have additional data, create a record in the signup_details table
+  if (!error && data.user && userData) {
+    try {
+      await supabase.from("signup_details").insert([
+        {
+          user_id: data.user.id,
+          email: email,
+          full_name: userData.name,
+          organization_name: userData.organizationName,
+          user_type: userType,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+      // Initialize the user's dataspace with default workspace, dashboard, pipeline, etc.
+      if (userData.name) {
+        await initializeUserDataspace({
+          id: data.user.id,
+          email: email,
+          full_name: userData.name,
+          organization_id: undefined,
+        });
+      }
+    } catch (detailsError) {
+      console.error("Error saving additional signup details:", detailsError);
+      // Continue with signup even if saving additional details fails
+    }
+  }
+
   return { data, error };
 };
 
@@ -251,4 +382,291 @@ export const fetchRecentOrganizations = async () => {
 
   if (error) throw error;
   return data;
+};
+
+// Contact Sales form submissions
+export interface ContactSalesFormData {
+  fullName: string;
+  workEmail: string;
+  phoneNumber: string;
+  jobTitle: string;
+  companyName: string;
+  companySize: string;
+  industry: string;
+  region: string;
+  message: string;
+}
+
+export const submitContactSalesForm = async (
+  formData: ContactSalesFormData
+) => {
+  const { data, error } = await supabase
+    .from("contact_requests")
+    .insert([
+      {
+        full_name: formData.fullName,
+        work_email: formData.workEmail,
+        phone_number: formData.phoneNumber,
+        job_title: formData.jobTitle,
+        company_name: formData.companyName,
+        company_size: formData.companySize,
+        industry: formData.industry,
+        region: formData.region,
+        message: formData.message,
+        status: "new",
+        created_at: new Date().toISOString(),
+      },
+    ])
+    .select();
+
+  return { data, error };
+};
+
+// Multi-tenant data isolation utilities
+export interface UserData {
+  id: string;
+  email: string;
+  full_name: string;
+  organization_id?: string;
+}
+
+// Core function to initialize tables with proper RLS policies for a new user
+export const initializeUserDataspace = async (user: UserData) => {
+  try {
+    // Create personal workspace for the user
+    const workspaceData = {
+      user_id: user.id,
+      name: `${user.full_name}'s Workspace`,
+      created_at: new Date().toISOString(),
+    };
+
+    const { data: workspace, error: workspaceError } = await supabase
+      .from("workspaces")
+      .insert([workspaceData])
+      .select()
+      .single();
+
+    if (workspaceError) throw workspaceError;
+
+    // Create default boards, pipelines, etc. for the new user
+    await Promise.all([
+      createDefaultPipeline(user.id, workspace.id),
+      createDefaultDashboard(user.id, workspace.id),
+      createDefaultSettings(user.id),
+    ]);
+
+    return { workspace, error: null };
+  } catch (error) {
+    console.error("Error initializing user dataspace:", error);
+    return { workspace: null, error };
+  }
+};
+
+// Create a default pipeline for new users
+const createDefaultPipeline = async (userId: string, workspaceId: string) => {
+  // Default pipeline stages
+  const defaultStages = [
+    { name: "Lead", order: 1 },
+    { name: "Qualified", order: 2 },
+    { name: "Proposal", order: 3 },
+    { name: "Negotiation", order: 4 },
+    { name: "Closed Won", order: 5 },
+    { name: "Closed Lost", order: 6 },
+  ];
+
+  // Create a default pipeline
+  const { data: pipeline, error: pipelineError } = await supabase
+    .from("pipelines")
+    .insert([
+      {
+        user_id: userId,
+        workspace_id: workspaceId,
+        name: "Default Sales Pipeline",
+        created_at: new Date().toISOString(),
+      },
+    ])
+    .select()
+    .single();
+
+  if (pipelineError) throw pipelineError;
+
+  // Create pipeline stages
+  const stagesData = defaultStages.map((stage) => ({
+    pipeline_id: pipeline.id,
+    user_id: userId,
+    name: stage.name,
+    order: stage.order,
+    created_at: new Date().toISOString(),
+  }));
+
+  await supabase.from("pipeline_stages").insert(stagesData);
+
+  return pipeline;
+};
+
+// Create a default dashboard for new users
+const createDefaultDashboard = async (userId: string, workspaceId: string) => {
+  const { data: dashboard, error } = await supabase
+    .from("dashboards")
+    .insert([
+      {
+        user_id: userId,
+        workspace_id: workspaceId,
+        name: "My Dashboard",
+        layout: {
+          widgets: [
+            {
+              id: "leads_overview",
+              type: "leads_overview",
+              position: { x: 0, y: 0, w: 6, h: 4 },
+            },
+            {
+              id: "pipeline_health",
+              type: "pipeline_health",
+              position: { x: 6, y: 0, w: 6, h: 4 },
+            },
+            {
+              id: "recent_activities",
+              type: "recent_activities",
+              position: { x: 0, y: 4, w: 12, h: 4 },
+            },
+          ],
+        },
+        created_at: new Date().toISOString(),
+      },
+    ])
+    .select()
+    .single();
+
+  return dashboard;
+};
+
+// Create default user settings
+const createDefaultSettings = async (userId: string) => {
+  const { data: settings, error } = await supabase
+    .from("user_settings")
+    .insert([
+      {
+        user_id: userId,
+        notifications_enabled: true,
+        email_notifications: true,
+        theme: "light",
+        created_at: new Date().toISOString(),
+      },
+    ])
+    .select()
+    .single();
+
+  return settings;
+};
+
+// Function to get all data for a specific user
+export const getUserData = async (userId: string) => {
+  // This function will automatically apply RLS policies based on the authenticated user
+  try {
+    const [
+      profileResult,
+      workspacesResult,
+      pipelinesResult,
+      dashboardsResult,
+      settingsResult,
+      leadsResult,
+    ] = await Promise.all([
+      supabase.from("user_profiles").select("*").eq("id", userId).single(),
+      supabase.from("workspaces").select("*").eq("user_id", userId),
+      supabase
+        .from("pipelines")
+        .select("*, pipeline_stages(*)")
+        .eq("user_id", userId),
+      supabase.from("dashboards").select("*").eq("user_id", userId),
+      supabase.from("user_settings").select("*").eq("user_id", userId).single(),
+      supabase
+        .from("leads")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ]);
+
+    return {
+      profile: profileResult.data,
+      workspaces: workspacesResult.data,
+      pipelines: pipelinesResult.data,
+      dashboards: dashboardsResult.data,
+      settings: settingsResult.data,
+      leads: leadsResult.data,
+      error: null,
+    };
+  } catch (error) {
+    console.error("Error fetching user data:", error);
+    return { error };
+  }
+};
+
+// Define lead data interface
+export interface LeadData {
+  name: string;
+  email: string;
+  phone?: string;
+  company?: string;
+  status: string;
+  stage_id?: string;
+  pipeline_id?: string;
+  source?: string;
+  notes?: string;
+  custom_fields?: Record<string, string | number | boolean | null>; // More specific than [key: string]: any
+}
+
+// Define dashboard update interface
+export interface DashboardUpdate {
+  name?: string;
+  layout?: {
+    widgets: Array<{
+      id: string;
+      type: string;
+      position: {
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+      };
+    }>;
+  };
+  is_default?: boolean;
+  updated_at?: string;
+}
+
+// Save lead data for a specific user
+export const saveLeadData = async (userId: string, leadData: LeadData) => {
+  const { data, error } = await supabase
+    .from("leads")
+    .insert([
+      {
+        ...leadData,
+        user_id: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ])
+    .select()
+    .single();
+
+  return { data, error };
+};
+
+// Additional helper functions for data operations
+export const updateUserDashboard = async (
+  userId: string,
+  dashboardId: string,
+  updates: DashboardUpdate
+) => {
+  const { data, error } = await supabase
+    .from("dashboards")
+    .update(updates)
+    .eq("id", dashboardId)
+    .eq("user_id", userId) // This ensures users can only update their own dashboards
+    .select()
+    .single();
+
+  return { data, error };
 };

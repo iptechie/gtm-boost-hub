@@ -33,7 +33,6 @@ import {
   Mail,
   Phone,
   MessageSquare,
-  ArrowLeft,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -166,14 +165,17 @@ const DemoScheduling = () => {
                 alt="GTMCentric"
                 className="h-24 w-auto object-contain select-none cursor-pointer"
                 onClick={(e) => {
-                  e.preventDefault();
-                  navigate("/");
+                  if (window.location.pathname === "/") {
+                    e.preventDefault();
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                  // If not on homepage, the Link component will handle navigation
                 }}
               />
             </Link>
             <Badge
               variant="outline"
-              className="ml-2 bg-purple-100 text-purple-800 border-purple-300 font-semibold"
+              className="ml-2 -mt-10 bg-purple-100 text-purple-800 border-purple-300 font-semibold"
             >
               BETA
             </Badge>
