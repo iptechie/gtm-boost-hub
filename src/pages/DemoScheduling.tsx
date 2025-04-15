@@ -37,6 +37,8 @@ import {
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { submitDemoSchedulingRequest } from "@/lib/supabase";
+import { toast } from "sonner";
 
 const DemoScheduling = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -50,6 +52,7 @@ const DemoScheduling = () => {
     attendees: "1-5",
     message: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
   // Scroll to top when component mounts
@@ -118,17 +121,49 @@ const DemoScheduling = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Here you would typically send the data to your backend
-    console.log({
-      date,
-      selectedTime,
-      selectedTimezone,
-      ...formData,
-    });
-    // Show success message or redirect
-    alert("Demo scheduled successfully! We'll be in touch shortly.");
+
+    if (!date) {
+      toast.error("Please select a date for your demo");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Format the date for database storage
+      const formattedDate = format(date, "yyyy-MM-dd");
+
+      // Submit the form data to Supabase
+      const { error } = await submitDemoSchedulingRequest({
+        name: formData.name,
+        email: formData.email,
+        company: formData.company,
+        phone: formData.phone,
+        attendees: formData.attendees,
+        message: formData.message,
+        date: formattedDate,
+        time: selectedTime,
+        timezone: selectedTimezone,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success("Demo scheduled successfully! We'll be in touch shortly.");
+
+      // Redirect to homepage after successful submission
+      setTimeout(() => {
+        navigate("/");
+      }, 2000);
+    } catch (error) {
+      console.error("Error scheduling demo:", error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Add a function to check if the form is valid
@@ -142,17 +177,6 @@ const DemoScheduling = () => {
       formData.company
     );
   };
-
-  // Log form state for debugging
-  useEffect(() => {
-    console.log("Form state:", {
-      date,
-      selectedTime,
-      selectedTimezone,
-      formData,
-      isFormValid: isFormValid(),
-    });
-  }, [date, selectedTime, selectedTimezone, formData]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8 select-none">
@@ -408,9 +432,9 @@ const DemoScheduling = () => {
                   <Button
                     type="submit"
                     className="w-full bg-indigo-600 hover:bg-indigo-700"
-                    disabled={!isFormValid()}
+                    disabled={!isFormValid() || isSubmitting}
                   >
-                    Schedule Demo
+                    {isSubmitting ? "Scheduling..." : "Schedule Demo"}
                   </Button>
                 </form>
               </CardContent>

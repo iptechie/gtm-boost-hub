@@ -670,3 +670,42 @@ export const updateUserDashboard = async (
 
   return { data, error };
 };
+
+// Define demo scheduling data interface
+export interface DemoSchedulingData {
+  name: string;
+  email: string;
+  company: string;
+  phone?: string;
+  attendees: string;
+  message?: string;
+  date: string;
+  time: string;
+  timezone: string;
+}
+
+// Save demo scheduling data
+export const submitDemoSchedulingRequest = async (
+  formData: DemoSchedulingData
+) => {
+  const { data, error } = await supabase
+    .from("demo_requests")
+    .insert([
+      {
+        full_name: formData.name,
+        email: formData.email,
+        company: formData.company,
+        phone: formData.phone || null,
+        attendees: formData.attendees,
+        message: formData.message || null,
+        requested_date: formData.date,
+        requested_time: formData.time,
+        timezone: formData.timezone,
+        status: "new",
+        created_at: new Date().toISOString(),
+      },
+    ])
+    .select();
+
+  return { data, error };
+};
